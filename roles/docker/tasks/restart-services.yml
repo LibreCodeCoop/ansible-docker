@@ -1,0 +1,3 @@
+- debug: msg="SISOP | Restart docker-compose services"
+  notify: restart docker-compose
+  changed_when: true

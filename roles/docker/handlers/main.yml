@@ -1,0 +1,16 @@
+- name: start docker-compose
+  community.docker.docker_compose:
+    project_name: "docker"
+    files: docker-compose.yml
+    project_src: /app
+    state: present
+    remove_orphans: true
+    pull: true
+
+- name: restart docker-compose
+  community.docker.docker_compose:
+    project_name: "docker"
+    files: docker-compose.yml
+    project_src: /app
+    build: false
+    restarted: true

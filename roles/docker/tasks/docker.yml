@@ -1,0 +1,33 @@
+- name: SISOP | Install required system packages
+  apt: name={{ requiredPackages }} state=latest update_cache=yes
+
+- name: SISOP | Add docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: SISOP | Add docker repository to apt
+  apt_repository:
+    repo: deb https://download.docker.com/linux/ubuntu focal stable
+    state: present
+
+- name: SISOP | Install docker
+  apt:
+    name: "{{ dockerPackages }}"
+    state: latest
+    update_cache: yes
+
+- name: SISOP | Install pip docker dependences
+  pip:
+    name: "{{ pipPackages }}"
+
+- name: SISOP | Creates app directory
+  file:
+    path: /app
+    state: directory
+
+- name: SISOP | Generate docker-compose.yml
+  ansible.builtin.template:
+    src: templates/docker-compose.yml.j2
+    dest: /app/docker-compose.yml
+  notify: start docker-compose

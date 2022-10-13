@@ -1,0 +1,6 @@
+---
+- import_tasks: docker.yml
+  when: docker | bool
+
+- import_tasks: restart-services.yml
+  when: restart | bool

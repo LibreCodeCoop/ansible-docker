@@ -1,0 +1,16 @@
+requiredPackages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - software-properties-common
+  - virtualenv
+
+dockerPackages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-compose-plugin
+
+pipPackages:
+  - docker
+  - docker-compose
