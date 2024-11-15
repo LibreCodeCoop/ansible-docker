@@ -22,6 +22,7 @@ requiredPackages:
   - curl
   - software-properties-common
   - virtualenv
+  - lsb
 
 dockerPackages:
   - docker-ce

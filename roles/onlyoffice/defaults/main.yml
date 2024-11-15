@@ -15,22 +15,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
-# https://github.com/ansible/ansible/blob/stable-2.9/examples/ansible.cfg
+---
+# import_controls
 
-
-[defaults]
-; callbacks_enabled = timer, profile_tasks, profile_roles
-forks=50
-pipelining = True
-;vault_password_file = ./.vault.pass.txt
-callbacks_enabled = timer
-
-interpreter_python = /usr/bin/python3
-host_key_checking  = False
-
-inventory        = inventory.ini
-remote_user      = vagrant
-private_key_file = /home/mohr/.ssh/id_rsa
-
-#[ssh_connection]
-#ssh_args = -o ControlMaster=auto -o ControlPersist=60s
+docker: true
+restart: true

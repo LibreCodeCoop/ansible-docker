@@ -1,15 +1,21 @@
 # Configurações
 
-Ambiente genérico com `docker-compose.yml` para deploy de serviços.
+Ambiente genérico com `docker compose.yml` para deploy de serviços.
 
 O primeiro passo é criar o arquivo `inventory.ini` e preencher com dados do host de destino.
 
 Exemplo:
 ```
-[all]
-master ansible_host=ip ansible_user=root
+[webserver]
+exemplo.com.br ansible_host=ip ansible_user=root
+192.168.0.100
 
+[databases]
+200.10.2.5
 ```
+
+Onde `ansible_host` e `ansible_user` são variáveis que serão utilizadas apenas no host `exemplo.com.br`.
+
 
 ### Caso o deploy possuir secrets, usar a etapa abaixo:
 
@@ -41,3 +47,9 @@ ansible-playbook playbook.yml -v \
           --inventory-file hosts \
           --extra-vars "@roles/docker/vars/.secrets.yml"
 ```
+
+
+# Parâmetros
+- Utilizando outra chave para se conectar aos hosts, defina `--key-file chave-ssh`:
+
+    - `ansible-playbook --inventory hosts.yml --key-file chave-ssh requirements-playbook.yml`

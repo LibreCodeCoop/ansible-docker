@@ -1,1 +1,3 @@
 inventory.ini
+ansible.cfg
+.vagrant

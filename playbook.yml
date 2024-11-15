@@ -19,7 +19,7 @@
 - name: "Deploy docker"
   hosts: all
   become: true
-  gather_facts: false
+  gather_facts: true
   strategy: free
   roles:
     - role: docker
