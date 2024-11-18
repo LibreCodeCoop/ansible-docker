@@ -1,0 +1,119 @@
+# Playbook para configurar uma nova instancia do onlyoffice
+
+
+- hosts: nextcloud
+  gather_facts: no
+
+  vars:
+    config_directory: /root/projects/onlyoffice
+    application: onlyoffice-onlyoffice-1
+    common_user: root
+    common_group: root
+    onlyoffice_url: url-do-onlyoffice
+    jwt_secret: jwt
+    db_oo_pwd: senha-do-banco
+    letsencrypt_email: email
+
+  tasks:
+    - name: Create onlyoffice config folder
+      ansible.builtin.file:
+        path: "{{ config_directory }}"
+        state: directory
+        owner: "{{ common_user }}"
+        group: "{{ common_group }}"
+        mode: "0644"
+
+    - name: Create docker networks
+      community.docker.docker_network:
+        name: "{{ item }}"
+        state: present
+        internal: false
+      loop:
+        - reverse-proxy
+        - postgres
+        - redis
+        - onlyoffice
+
+
+    - name: Create onlyoffice docker-compose.yml
+      ansible.builtin.copy:
+        dest: "/root/projects/onlyoffice/docker-compose.yml"
+        content: |
+          networks:
+            reverse-proxy:
+              external: true
+              name: reverse-proxy
+            postgres:
+              external: true
+              name: postgres
+            redis:
+              external: true
+              name: redis
+            onlyoffice:
+              external: true
+              name: onlyoffice
+
+          services:
+            onlyoffice:
+              image: systemcrashpoa/nerdseverino:Onlyoffice-8-amd64
+              stdin_open: true
+              tty: true
+              restart: always
+              env_file:
+                - .env
+              volumes:
+                - ./volumes/onlyoffice/DocumentServer/logs:/var/log/onlyoffice
+                - ./volumes/onlyoffice/DocumentServer/data:/var/www/onlyoffice/Data
+                - ./volumes/onlyoffice/DocumentServer/lib:/var/lib/onlyoffice
+                - ./volumes/onlyoffice/DocumentServer/rabbitmq:/var/lib/rabbitmq
+                - ./volumes/onlyoffice/DocumentServer/my_fonts_folder:/usr/share/fonts/truetype/custom
+              networks:
+                - postgres
+                - redis
+                - onlyoffice
+                - reverse-proxy
+        owner: root  # ajuste o dono, se necessário
+        group: root  # ajuste o grupo, se necessário
+        mode: '0644'
+
+    - name: Create onlyoffice .env file
+      ansible.builtin.copy:
+        dest: "/root/projects/onlyoffice/.env"
+        content: |
+          VIRTUAL_HOST={{ onlyoffice_url }}
+          LETSENCRYPT_HOST={{ onlyoffice_url }}
+          LETSENCRYPT_EMAIL={{ letsencrypt_email }}
+
+          JWT_ENABLED=true
+          JWT_SECRET={{ jwt_secret }}
+          DB_TYPE=postgres
+          DB_HOST=postgres
+          DB_PORT=5432
+          DB_NAME=onlyoffice
+          DB_USER=onlyoffice
+          DB_PWD={{ db_oo_pwd }}
+
+        owner: root  # ajuste o dono, se necessário
+        group: root  # ajuste o grupo, se necessário
+        mode: '0644'
+
+    - name: Pull newer onlyoffice image
+      community.docker.docker_compose_v2:
+        project_src: "{{ config_directory }}"
+        pull: always
+
+    - name: Restart containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ config_directory }}"
+        state: restarted
+        recreate: always
+
+    - name: Check webserver response
+      ansible.builtin.uri:
+        url: "https://{{ onlyoffice_url }}/healthcheck"
+        method: GET
+        follow_redirects: none
+      register: _result
+      until: _result.status == 200
+      retries: 720 # 720 * 5 segundos = 1 hora (60*60/5) 
+      delay: 5 # A cada 5 segundos
