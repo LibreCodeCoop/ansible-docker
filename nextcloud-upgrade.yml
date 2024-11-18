@@ -1,0 +1,85 @@
+# Routine to upgrade Nextcloud version
+# See variable NEXTCLOUD-VERSION to build your specific version
+
+- hosts: nextcloud
+  gather_facts: yes
+  tasks:
+
+    - name: get nextcloud version
+      community.docker.docker_container_exec:
+        container: nextcloud-docker-app-1
+        user: www-data
+        command: "php occ --version"
+      register: result
+
+    - name: Print stdout
+      ansible.builtin.debug:
+        var: result.stdout
+
+    - name: Update NEXTCLOUD_VERSION in Dockerfile
+      ansible.builtin.lineinfile:
+        path: /root/projects/nextcloud-docker/.docker/app/Dockerfile
+        regexp: '^ARG NEXTCLOUD_VERSION=.*'
+        line: 'ARG NEXTCLOUD_VERSION=30-fpm'
+        state: present
+      become: true
+
+    - name: Build images
+      community.docker.docker_compose_v2:
+        project_src: /root/projects/nextcloud-docker
+        build: always
+      register: output
+
+    - name: Show results
+      ansible.builtin.debug:
+        var: output
+
+    - name: Enable maintenance mode
+      community.docker.docker_container_exec:
+        container: nextcloud-docker-app-1
+        user: www-data
+        command: "php occ maintenance:mode --on"
+      register: result
+
+
+    - name: Restart containers
+      community.docker.docker_compose_v2:
+        project_src: /root/projects/nextcloud-docker
+        state: restarted
+        recreate: always
+      register: output
+
+    - name: Show results
+      ansible.builtin.debug:
+        var: output
+
+    - name: Run aditional occ commands
+      community.docker.docker_container_exec:
+        container: nextcloud-docker-app-1
+        user: www-data
+        command: "php occ {{ item }}"
+      loop:
+        - db:add-missing-columns
+        - db:add-missing-indices
+        - db:add-missing-primary-keys
+        - maintenance:repair --include-expensive
+        - config:system:set maintenance_window_start --type=integer --value=1
+        - app:update --all
+
+    - name: Disable nextcloud maintenance mode
+      community.docker.docker_container_exec:
+        container: nextcloud-docker-app-1
+        user: www-data
+        command: "php occ maintenance:mode --off"
+      register: result
+
+    - name: Get nextcloud version
+      community.docker.docker_container_exec:
+        container: nextcloud-docker-app-1
+        user: www-data
+        command: "php occ --version"
+      register: result
+
+    - name: Print stdout
+      ansible.builtin.debug:
+        var: result.stdout
