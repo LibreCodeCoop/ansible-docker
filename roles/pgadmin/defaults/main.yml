@@ -1,0 +1,15 @@
+---
+pgadmin_description: pgAdmin
+pgadmin_data_dir: /root/projects/pgtesting
+#pgadmin_volume_name: "{{ pgadmin_hostname }}"
+#pgadmin_script_name: ""
+#pgadmin_ports:
+#  - 127.0.0.1:5050:80
+
+pgadmin_image: dpage/pgadmin4:7.6
+pgadmin_description: Admin for postgres01 # default: pgAdmin
+
+pgadmin_user: admin@example.com
+pgadmin_password: alguma-senha-aqui
+pgadmin_domain: algum-dominio-aqui
+pgadmin_letsencrypt_email: algum-email-aqui

@@ -1,0 +1,24 @@
+networks:
+  postgres:
+    external: true
+    name: postgres
+  reverse-proxy:
+    external: true
+    name: reverse-proxy
+
+services:
+  pgadmin:
+    container_name: {{ pgadmin_domain }}
+    image: dpage/pgadmin4
+    environment:
+      - PGADMIN_DEFAULT_EMAIL
+      - PGADMIN_DEFAULT_PASSWORD
+      - VIRTUAL_HOST
+      - LETSENCRYPT_HOST
+      - LETSENCRYPT_EMAIL
+    volumes:
+      - ./volumes/pgadmin:/root/.pgadmin
+      - /root/projects/postgres/volumes/postgres/dump:/backup
+    networks:
+      - postgres
+      - reverse-proxy

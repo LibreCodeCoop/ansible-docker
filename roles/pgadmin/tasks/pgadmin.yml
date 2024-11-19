@@ -1,0 +1,41 @@
+---
+- name: Create docker networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: present
+    internal: false
+  loop:
+    - reverse-proxy
+    - postgres
+
+- name: Ensure {{ role_name }} data dir exists
+  ansible.builtin.file:
+    path: "{{ pgadmin_data_dir }}"
+    state: directory
+
+- name: Copy {{ role_name }} env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ pgadmin_data_dir }}/.env"
+
+- name: Copy {{ role_name }} compose file
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ pgadmin_data_dir }}/compose.yml"
+  notify: Restart {{ role_name }} container
+
+- name: Start {{ role_name }} container {{ pgadmin_hostname }}
+  community.docker.docker_compose_v2:
+    project_src: "{{ pgadmin_data_dir }}"
+    state: present
+
+- name: Check {{ pgadmin_domain}} response
+  ansible.builtin.uri:
+    url: "https://{{ pgadmin_domain }}"
+    method: GET
+    follow_redirects: all
+  register: _result
+  until: _result.status == 200
+  retries: 720 # 720 * 5 segundos = 1 hora (60*60/5) 
+  delay: 5 # A cada 5 segundos
+
