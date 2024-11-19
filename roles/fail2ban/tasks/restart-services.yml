@@ -1,5 +1,0 @@
-- name: Enable Fail2Ban service
-  systemd:
-    name: fail2ban
-    enabled: yes
-    state: restarted

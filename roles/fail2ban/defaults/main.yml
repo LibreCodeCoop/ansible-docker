@@ -1,9 +1,0 @@
-# defaults/main.yml
----
-fail2ban_packages:
-  - name: fail2ban
-fail2ban_enabled: false
-fail2ban_sshd_enabled: "true"
-fail2ban_bantime: "-1" # -1 = permanente, 24h = 1 dia
-fail2ban_ignoreip: "127.0.0.1/8"
-fail2ban_maxretry: 3
