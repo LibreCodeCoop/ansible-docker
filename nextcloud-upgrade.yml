@@ -20,7 +20,7 @@
       ansible.builtin.lineinfile:
         path: /root/projects/nextcloud-docker/.docker/app/Dockerfile
         regexp: '^ARG NEXTCLOUD_VERSION=.*'
-        line: 'ARG NEXTCLOUD_VERSION=30-fpm'
+        line: 'ARG NEXTCLOUD_VERSION=stable-fpm'
         state: present
       become: true
 
