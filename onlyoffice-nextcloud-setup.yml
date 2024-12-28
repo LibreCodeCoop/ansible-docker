@@ -1,5 +1,5 @@
-# Playbook to install and connect nextcloud to an existing onlyoffice instance
-# Variables to change:
+# Playbook para instalar e conectar o Nextcloud a uma instância do Onlyoffice
+# Variáveis para mudar:
 # onlyoffice_url
 # jwt_secret
 
@@ -11,8 +11,8 @@
     application: nextcloud-docker-app-1
     common_user: root
     common_group: root
-    onlyoffice_url: https://url-of-onlyoffice
-    jwt_secret: change-me
+    onlyoffice_url: https://url-do-onlyoffice-MUDE-ME
+    jwt_secret: MUDE-ME
 
   tasks:
     - name: Install onlyoffice app
