@@ -1,0 +1,14 @@
+# Endereços IP públicos dos servidores backend
+haproxy_backend_servers:
+  - name: server1
+    ip:   189.39.218.225 
+  - name: server2
+    ip:   177.92.115.140
+    port: 80
+
+# Porta do HAProxy
+haproxy_frontend_port: 80
+
+# Configurações de Health Check
+haproxy_health_check_path: "/health"
+haproxy_health_check_interval: "5s"

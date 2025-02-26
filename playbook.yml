@@ -15,11 +15,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
-
-- name: "Deploy docker"
-  hosts: all
-  become: true
-  gather_facts: true
-  strategy: free
+#- name: "Deploy docker"
+#  hosts: lisa
+#  become: true
+#  gather_facts: true
+#  strategy: free
+#  roles:
+#    - role: docker
+---
+- name: Configurar HAProxy em 3 servidores
+  hosts: haproxy_servers
+  become: yes
   roles:
-    - role: docker
+    - haproxy

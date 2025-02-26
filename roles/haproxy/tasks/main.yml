@@ -1,0 +1,41 @@
+---
+- name: Instalar o HAProxy
+  apt:
+    name: haproxy
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+  become: yes
+
+- name: Instalar o HAProxy (CentOS/RHEL)
+  yum:
+    name: haproxy
+    state: present
+  when: ansible_os_family == "RedHat"
+  become: yes
+
+- name: Criar diretório para certificados
+  file:
+    path: /etc/haproxy/certs
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  become: yes
+
+- name: Configurar o HAProxy
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reiniciar HAProxy
+  become: yes
+
+- name: Habilitar e iniciar o HAProxy
+  service:
+    name: haproxy
+    state: started
+    enabled: yes
+  become: yes
