@@ -17,7 +17,7 @@
 #
 
 - name: start docker-compose
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_name: "docker"
     files: docker-compose.yml
     project_src: /app
@@ -26,7 +26,7 @@
     pull: true
 
 - name: restart docker-compose
-  community.docker.docker_compose:
+  community.docker.docker_compose_v2:
     project_name: "docker"
     files: docker-compose.yml
     project_src: /app

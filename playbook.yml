@@ -17,9 +17,9 @@
 #
 
 - name: "Deploy docker"
-  hosts: all
+  hosts: oracle
   become: true
   gather_facts: true
-  strategy: free
+  #strategy: free
   roles:
     - role: docker

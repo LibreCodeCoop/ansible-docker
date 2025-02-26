@@ -1,3 +1,5 @@
 inventory.ini
 ansible.cfg
 .vagrant
+ssh*
+ansible.cfg

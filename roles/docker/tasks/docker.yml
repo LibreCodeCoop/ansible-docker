@@ -1,69 +1,81 @@
-# This file is part of LibreCodeCoop/ansible-docker
-#
-# Copyright (C) 2022 LibreCode coop <contact@librecode.coop>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>
-#
-- name: SISOP | Install required system packages
-  ansible.builtin.apt: 
+
+
+- name: Install required system packages (Debian-based)
+  ansible.builtin.apt:
     name:
       - apt-transport-https
       - ca-certificates
-      - lsb-release
+      - curl
       - gnupg
+      - lsb-release
     state: latest
-    update_cache: true
+    update_cache: yes
+  when: ansible_os_family == "Debian"
 
-- name: SISOP | Add docker GPG key
+- name: Install required system packages (Red Hat-based)
+  ansible.builtin.yum:
+    name:
+      - yum-utils
+      #- device-mapper-persistent-data
+      #- lvm2
+    state: latest
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Add Docker GPG key (Debian-based)
   ansible.builtin.apt_key:
-    url: "https://download.docker.com/linux/{{ ansible_os_family | lower }}/gpg"
+    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
     state: present
+  when: ansible_os_family == "Debian"
 
-- name: Get DEB architecture
-  shell: dpkg --print-architecture
-  register: deb_architecture
-
-
-- name: Add repository into sources list
+- name: Add Docker repository (Debian-based)
   ansible.builtin.apt_repository:
-    repo: "deb [arch={{ deb_architecture.stdout }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+    repo: "deb [arch={{ ansible_architecture }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
     state: present
     filename: docker
+  when: ansible_os_family == "Debian"
 
-- name: Install Docker
+- name: Add Docker repository (Red Hat-based)
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+  when: ansible_os_family == "RedHat"
+
+- name: Install Docker (Debian-based)
   ansible.builtin.apt:
     name:
       - docker-ce
       - docker-ce-cli
       - containerd.io
-      - docker-compose
       - docker-compose-plugin
     state: latest
-    update_cache: true
+    update_cache: yes
+  when: ansible_os_family == "Debian"
 
-- name: Start and enable service docker
+- name: Install Docker (Red Hat-based)
+  ansible.builtin.yum:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: latest
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Start and enable Docker service
   ansible.builtin.service:
     name: docker
     enabled: yes
     state: started
 
 - name: Create docker group
-  group:
+  ansible.builtin.group:
     name: "{{ docker_group }}"
     state: present
 
 - name: Add user to docker group
-  user:
+  ansible.builtin.user:
     name: "{{ ansible_user }}"
-    group: "{{ docker_group }}"
+    groups: "{{ docker_group }}"
+    append: yes
