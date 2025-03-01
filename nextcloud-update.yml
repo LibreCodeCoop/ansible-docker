@@ -57,7 +57,8 @@
         - maintenance:repair --include-expensive
         - config:system:set maintenance_window_start --type=integer --value=1
         - app:update --all
-
+      ignore_errors: yes
+      
     - name: Disable nextcloud maintenance mode
       community.docker.docker_container_exec:
         container: nextcloud-docker-app-1
