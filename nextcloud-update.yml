@@ -5,7 +5,7 @@
   gather_facts: yes
   tasks:
 
-    - name: get nextcloud version
+    - name: Get nextcloud version
       community.docker.docker_container_exec:
         container: nextcloud-docker-app-1
         user: www-data
@@ -15,14 +15,6 @@
     - name: Print stdout
       ansible.builtin.debug:
         var: result.stdout
-
-    - name: Update NEXTCLOUD_VERSION in Dockerfile
-      ansible.builtin.lineinfile:
-        path: /root/projects/nextcloud-docker/.docker/app/Dockerfile
-        regexp: '^ARG NEXTCLOUD_VERSION=.*'
-        line: 'ARG NEXTCLOUD_VERSION=stable-fpm'
-        state: present
-      become: true
 
     - name: Build images
       community.docker.docker_compose_v2:
