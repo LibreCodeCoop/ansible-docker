@@ -1,0 +1,4 @@
+---
+
+nginx_proxy_project_path: "/root/projects/nginx-proxy"
+nginx_proxy_network_name: "reverse-proxy"

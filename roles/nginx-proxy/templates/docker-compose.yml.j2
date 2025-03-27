@@ -16,13 +16,10 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-- name: "Deploy docker"
-  hosts: manager
-  become: yes
-  become_method: sudo
-  gather_facts: true
-  #remote_user: root
-  #strategy: free
-  roles:
-#    - role: docker
-    - role: nginx-proxy
+version: '3.9'
+services:
+  nginx:
+      image: nginx:latest
+      container_name: nginx
+      ports:
+          - "80:80"

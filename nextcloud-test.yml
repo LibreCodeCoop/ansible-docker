@@ -1,0 +1,22 @@
+# Routine to upgrade Nextcloud version
+# See variable NEXTCLOUD-VERSION to build your specific version
+
+- hosts: sara
+  gather_facts: no
+  vars:
+    nextcloud_url: https://
+    nextcloud_project_dir: /root/projects/nextcloud-docker
+    nextcloud_app_container: nextcloud-docker-app-1
+
+  tasks:
+    - name: Get nextcloud version
+      community.docker.docker_compose_v2_exec:
+        service: app
+        user: www-data
+        project_src: "{{ nextcloud_project_dir }}"
+        command: php occ --version
+      register: result
+
+    - name: Print stdout
+      ansible.builtin.debug:
+        var: result.stdout

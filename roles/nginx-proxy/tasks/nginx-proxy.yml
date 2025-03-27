@@ -1,0 +1,38 @@
+---
+#Ansible role for setting up nginx-proxy
+- name: Ensure required packages are installed
+  ansible.builtin.package:
+    name:
+      - git
+      - docker
+      - docker-compose
+    state: present
+
+- name: Create projects directory
+  ansible.builtin.file:
+    path: "{{ nginx_proxy_project_path }}"
+    state: directory
+    mode: '0755'
+
+- name: Clone nginx-proxy repository
+  ansible.builtin.git:
+    repo: 'https://github.com/LibreCodeCoop/nginx-proxy.git'
+    dest: "{{ nginx_proxy_project_path }}"
+    version: master
+    force: yes
+    
+- name: Create docker network
+  community.docker.docker_network:
+    name: "{{ nginx_proxy_network_name }}"
+    state: present
+
+- name: Start nginx-proxy services
+  community.docker.docker_compose_v2:
+    project_src: "{{ nginx_proxy_project_path }}"
+    state: present
+    pull: always
+
+- name: Ensure docker services are running
+  community.docker.docker_compose_v2:
+    project_src: "{{ nginx_proxy_project_path }}"
+    state: present

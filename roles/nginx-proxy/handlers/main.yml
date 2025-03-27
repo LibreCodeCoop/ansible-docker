@@ -1,0 +1,4 @@
+- name: Restart nginx-proxy
+  community.docker.docker_compose_v2:
+    project_src: "{{ nginx_proxy_project_path }}"
+    restarted: yes
