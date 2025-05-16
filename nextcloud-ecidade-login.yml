@@ -41,7 +41,7 @@
         recurse: yes
         owner: www-data
         group: www-data
-        mode: '0644'
+        #mode: '0644'
 
     - name:  Habilitar e-cidade login usando o comando occ
       community.docker.docker_compose_v2_exec:
@@ -87,7 +87,7 @@
         recurse: yes
         owner: www-data
         group: www-data
-        mode: '0755'
+        #mode: '0644'
 
     - name:  Habilitar user_backend_sql_raw usando o comando occ
       community.docker.docker_compose_v2_exec:
