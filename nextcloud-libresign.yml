@@ -1,0 +1,64 @@
+---
+- name: Instalar LibreSign no Nextcloud
+  hosts: all
+  become: yes
+  gather_facts: no
+
+  vars:
+    pasta_base_projeto: ""  # Deve ser customizado para cada cliente
+    pasta_apps_personalizados: "volumes/nextcloud/custom_apps/"
+    versao_libresign: "10.4.3"
+    url_libresign: "https://github.com/LibreSign/libresign/releases/download/v{{ versao_libresign }}/libresign-v{{ versao_libresign }}.tar.gz"
+    arquivo_compactado: "libresign-v{{ versao_libresign }}.tar.gz"
+    pasta_libresign: "libresign"
+    comando_occ:
+      - "php occ maintenance:repair --include-expensive"
+      - "php occ db:add-missing-indices"
+      - "php occ app:enable libresign"
+      - "php occ config:app:set theming name --value 'LibreSign'"
+      - "php occ config:app:set theming slogan --value 'Um lar seguro para todos os seus dados'"
+      - "php occ config:app:set theming url --value 'https://libresign.coop'"
+      - "php occ config:app:set theming color --value '#144042'"
+      - "php occ config:app:set libresign extra_settings --value=1"
+      - "php occ config:app:set libresign legal_information --value='Documento assinado digitalmente com LibreSign e pode ser firmado eletronicamente, sendo facultativo a utilização de certificado digital emitido no padrão estabelecido pela ICP-Brasil, reputando-se plenamente válido, em todo o seu conteúdo, integridade e autenticidade, garantidas por sistema de criptografia, em total conformidade com o artigo 10, § 2º, da Medida Provisória 2.200-2/2001.'"
+      - "php occ config:system:set default_language --value=pt_BR"
+      - "php occ config:system:set defaultapp --value libresign"
+      - "php occ config:system:set has_valid_subscription --type=boolean --value=true"
+      - "php occ config:system:set knowledgebaseenabled --value false --type boolean"
+  tasks:
+    - name: Baixar o LibreSign
+      get_url:
+        url: "{{ url_libresign }}"
+        dest: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ arquivo_compactado }}"
+        #mode: '0644'
+
+    - name: Extrair o LibreSign
+      unarchive:
+        src: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ arquivo_compactado }}"
+        dest: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}"
+        remote_src: yes
+        creates: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_libresign }}"
+
+    - name: Ajustar permissões do LibreSign
+      file:
+        path: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_libresign }}"
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+        #mode: '0644'
+
+    - name:  Instalar LibreSign e rodar comandos occ adicionais
+      community.docker.docker_compose_v2_exec:
+        service: app
+        user: www-data
+        project_src: "{{ pasta_base_projeto }}"
+        command: "{{ item }}"
+      loop: "{{ comando_occ }}"
+      register: occ_results
+      ignore_errors: yes 
+
+    - name: Mostrar resultados dos comandos
+      debug:
+        var: occ_results.results
+

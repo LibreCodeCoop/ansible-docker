@@ -1,0 +1,99 @@
+---
+- name: Instalar login e-cidade no Nextcloud
+  hosts: all
+  become: yes
+  gather_facts: no
+
+  vars:
+    pasta_base_projeto: ""  # Deve ser customizado
+    pasta_apps_personalizados: "volumes/nextcloud/custom_apps/"
+    versao_libresign: "10.4.3"  
+    url_libresign: "https://github.com/LibreSign/libresign/releases/download/v{{ versao_libresign }}/libresign-v{{ versao_libresign }}.tar.gz"
+    arquivo_compactado: "libresign-v{{ versao_libresign }}.tar.gz"
+    pasta_ecidadelogin: "ecidade_login"
+    pasta_user_backend_sql_raw: "user_backend_sql_raw"
+    comando_occ_ecidade: "php occ app:enable ecidade_login"
+    comando_user_backend_sql_raw: "php occ app:enable user_backend_sql_raw"
+  tasks:
+    - name: Clonar repositório e-cidade_login
+      git:
+        repo: "https://github.com/e-cidade/ecidade_login"
+        dest: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_ecidadelogin }}" 
+        version: "main"                # Ou especifique outro branch/tag
+        single_branch: yes
+        depth: 1
+        recursive: yes
+        clone: yes
+        update: no
+        force: no
+        accept_hostkey: yes
+
+    - name: Instalar dependências do Composer no diretório ecidade_login
+      block:
+        - name: Entrar no diretório e executar Composer via Docker
+          command: >
+            docker run -v {{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/ecidade_login:/app composer composer install --no-dev
+ 
+    - name: Ajustar permissões do ecidade_login
+      file:
+        path: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_ecidadelogin }}"
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name:  Habilitar e-cidade login usando o comando occ
+      community.docker.docker_compose_v2_exec:
+        service: app
+        user: www-data
+        project_src: "{{ pasta_base_projeto }}"
+        command: "{{ comando_occ_ecidade }}"
+      register: result
+
+    - name: Clonar repositório user_backend_sql_raw
+      git:
+        repo: "https://github.com/vitormattos/user_backend_sql_raw"
+        dest: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_user_backend_sql_raw }}" 
+        version: "fork"                # Ou especifique outra branch/tag
+        single_branch: yes
+        depth: 1
+        recursive: yes
+        clone: yes
+        update: no
+        force: no
+        accept_hostkey: yes
+
+#    - name: Instalar dependências do Composer no diretório user_backend_sql_raw
+#      block:
+#        - name: Entrar no diretório e executar Composer via Docker
+#          command: >
+#            docker run -v {{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_user_backend_sql_raw }}:/app composer composer install --no-dev
+# 
+    - name: Instalar dependências do Composer no diretório user_backend_sql_raw
+      community.docker.docker_container:
+        name: "composer_installer"
+        image: "composer:latest"
+        volumes:
+          - "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_user_backend_sql_raw }}:/app"
+        command: "composer install --no-dev"
+        auto_remove: true
+        detach: false
+
+    - name: Ajustar permissões do user_backend_sql_raw
+      file:
+        path: "{{ pasta_base_projeto }}/{{ pasta_apps_personalizados }}/{{ pasta_user_backend_sql_raw }}"
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name:  Habilitar user_backend_sql_raw usando o comando occ
+      community.docker.docker_compose_v2_exec:
+        service: app
+        user: www-data
+        project_src: "{{ pasta_base_projeto }}"
+        command: "{{ comando_user_backend_sql_raw }}"
+      register: result
+

@@ -1,14 +1,23 @@
 # Routine to upgrade Nextcloud version
 # See variable NEXTCLOUD-VERSION to build your specific version
 
-- hosts: all
+- hosts: haproxy_servers
   gather_facts: no
   vars:
-    nextcloud_url: https://
-    nextcloud_project_dir: /root/projects/nextcloud-docker
+    nextcloud_url: https://lugar1.librecode.coop
+    nextcloud_project_dir: /root/projects/nextcloud-only
     nextcloud_app_container: app
+    nextcloud_version: 31-fpm
 
   tasks:
+    - name: Prune everything
+      community.docker.docker_prune:
+        containers: true
+        images: true
+        networks: true
+        volumes: true
+        builder_cache: true
+
     - name: Get nextcloud version
       community.docker.docker_compose_v2_exec:
         service: app
@@ -21,12 +30,27 @@
       ansible.builtin.debug:
         var: result.stdout
 
-    - name: Build images
-      community.docker.docker_compose_v2:
-        project_src: "{{ nextcloud_project_dir }}"
-        build: always
-      register: output
+    - name: Build Nextcloud containers with specific version
+      ansible.builtin.command: >
+        docker compose build 
+        --build-arg NEXTCLOUD_VERSION=31-fpm 
+        --pull 
+        --no-cache
+      args:
+        chdir: "{{ nextcloud_project_dir }}"
 
+#    - name: Build images
+#      community.docker.docker_compose_v2:
+#        project_src: "{{ nextcloud_project_dir }}"
+#        build: always
+#      register: output
+#
+#    - name: Build images
+#      community.docker.docker_image_build:
+#        name: "{{ nextcloud_version }}"
+#        path: "{{ nextcloud_project_dir }}/.docker/app"
+#        args: NEXTCLOUD_VERSION="{{ nextcloud_version }}"
+#      register: output
 
     - name: Show results
       ansible.builtin.debug:
