@@ -28,7 +28,7 @@
 
     - name: Print stdout
       ansible.builtin.debug:
-        var: result.stdout
+        var: result
 
     - name: Build Nextcloud containers with specific version
       ansible.builtin.command: >
