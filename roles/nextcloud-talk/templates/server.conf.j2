@@ -1,0 +1,50 @@
+[http]
+listen = 0.0.0.0:8080
+
+[app]
+debug = false
+trustedproxies = 172.19.0.1/16
+
+[sessions]
+hashkey = 8766830f88a5084dc7eda39b5887407029e66e423a6d0aa1ecd6dc8fcc530bd5
+blockkey = fcc1f15c4e0395174a6ec29b1415c881
+
+[clients]
+internalsecret = f3d98d6611c8dce8c8f71c565685d819c2839c1e6d26525c3c6f23b782efb947
+
+[backend]
+backends = backend
+allowall = false
+timeout = 20
+connectionsperhost = 40
+
+[backend]
+url = https://{{ nextcloud_url }}
+secret = {{ backend_secret}}
+
+[nats]
+url = nats://{{ nextcloud_url }}:4222
+
+[mcu]
+type = janus
+url = ws://{{ nextcloud_url }}.br:8188
+maxstreambitrate = 1048576
+maxscreenbitrate = 2097152
+
+[turn]
+apikey = 94896fe6-b059-4415-baf3-bc544e3b93cd
+secret = {{ turn_secret }}
+servers = turn:{{ nextcloud_url }}:3478?transport=udp,turn:{{ nextcloud_url }}:3478?transport=tcp
+
+[geoip]
+
+[geoip-overrides]
+
+[continent-overrides]
+
+[stats]
+
+[etcd]
+
+[grpc]
+

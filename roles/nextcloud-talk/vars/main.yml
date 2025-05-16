@@ -1,6 +1,6 @@
 # This file is part of LibreCodeCoop/ansible-docker
 #
-# Copyright (C) 2022 LibreCode coop <contact@librecode.coop>
+# Copyright (C) 2025 LibreCode coop <contact@librecode.coop>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -16,13 +16,30 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>
 #
 
-- name: "Deploy docker"
-  hosts: vagrant
-  become: yes
-  become_method: sudo
-  gather_facts: true
-  #remote_user: root
-  #strategy: free
-  roles:
-    - role: docker
-#    - role: nginx-proxy
+# Variaveis genéricas
+email_le: "contato@henriquemohr.net.br"
+nextcloud_url: "cloud.henriquemohr.net.br"
+
+# Spreedbackend variáveis
+spreed_image: "mwalbeck/nextcloud-spreed-signaling"
+spreed_virtual_host: "talksignaling.henriquemohr.net.br"
+spreed_virtual_port: 8080
+spreed_use_janus: 1
+
+# server.conf variáveis
+backend_secret: 
+sessions_hashkey:
+sessions_blockkey:
+
+# Nats variáveis
+nats_image: "nats:2-alpine"
+
+# Janus variáveis
+janus_image: "ghcr.io/librecodecoop/janus:1.3.1"
+janus_virtual_host: "janus.henriquemohr.net.br"
+
+# Turn variáveis
+turn_secret:
+turn_image: coturn/coturn:edge-debian
+turn_virtual_host:
+turn_virtual_port: 3478

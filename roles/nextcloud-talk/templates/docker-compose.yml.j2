@@ -1,0 +1,120 @@
+# This file is part of LibreCodeCoop/ansible-docker
+#
+# Copyright (C) 2025 LibreCode coop <contact@librecode.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>
+#
+
+networks:
+  reverse-proxy:
+    external: true
+    name: reverse-proxy
+  internal:
+    #external: true
+    name: internal
+  coturn-redis:
+    name: coturn-redis 
+
+services:     
+  spreedbackend:
+    image: {{ spreed_image }}
+    volumes:
+      - ./server.conf:/config/server.conf
+      - ./volumes/hpb/ssl/:/etc/nginx/ssl/
+      # - /root/projects/nginx-proxy/volumes/certs/cloud.henriquemohr.net.br/key.pem:/etc/nginx/ssl/server.key
+      # - /root/projects/nginx-proxy/volumes/certs/cloud.henriquemohr.net.br/fullchain.pem:/etc/nginx/ssl/server.crt
+    # network_mode: host
+    restart: unless-stopped
+    environment:
+      - JANUS_URL={{ janus_virtual_host }}
+      - USE_JANUS={{ spreed_use_janus }}
+      - VIRTUAL_HOST={{ spreed_virtual_host }}
+      - LETSENCRYPT_HOST={{ spreed_virtual_host }}
+      - LETSENCRYPT_EMAIL={{ email_le }}
+      - VIRTUAL_PORT={{ spreed_virtual_port }}
+    networks:
+      - reverse-proxy
+      - internal
+  nats:
+    image: {{ nats_image }}
+    volumes:
+      - ./gnatsd.conf:/config/gnatsd.conf
+    command: ["-c", "/config/gnatsd.conf"]
+    network_mode: host
+    restart: unless-stopped
+
+  janus:
+    image: {{ janus_image }}
+    command: ["janus", "--full-trickle"]
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - VIRTUAL_HOST={{ janus_virtual_host }}
+      - LETSENCRYPT_HOST={{ janus_virtual_host }}
+      - LETSENCRYPT_EMAIL={{ email_le }}
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    #command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./volumes/redis/data:/data
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    #env_file: 
+    #  - redis/redis.env
+    networks:
+      - coturn-redis
+
+# Coturn
+  coturn:
+    image: {{ turn_image }}
+    restart: always
+    volumes:
+      - ./turnserver.conf:/etc/turnserver.conf:ro
+      - ./coturn/privkey.pem:/etc/ssl/private/privkey.pem:ro
+      - ./coturn/cert.pem:/etc/ssl/certs/cert.pem:ro
+    ports:
+## STUN/TURN
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "3479:3479"
+      - "3479:3479/udp"
+        #- "80:80"
+        #- "80:80/udp"
+## STUN/TURN SSL
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "5350:5350"
+      - "5350:5350/udp"
+        #- "443:443"
+        #- "443:443/udp"
+# Relay Ports
+#      - "49152-65535:49152-65535"
+#      - "49152-65535:49152-65535/udp"
+    environment:
+      - VIRTUAL_HOST={{ turn_virtual_host }}
+      - LETSENCRYPT_HOST={{ turn_virtual_host }}
+      - LETSENCRYPT_EMAIL={{ email_le }}
+      - VIRTUAL_PORT={{ turn_virtual_port }}
+    networks:
+      - internal
+      - coturn-redis
+      - reverse-proxy
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
+
