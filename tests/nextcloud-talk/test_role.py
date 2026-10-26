@@ -6,6 +6,7 @@ import os
 import pwd
 import re
 import secrets
+import shutil
 import subprocess
 import tempfile
 import time
@@ -17,6 +18,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SUITE = ROOT / "tests" / "nextcloud-talk"
 DIGEST = "7d9c1bd28bdbc7702de924ed8a676f5c1f11afa3abc888654d8d4fc8b78a00d2"
 IMAGE = f"ghcr.io/librecodecoop/janus:1.4.3-r1@sha256:{DIGEST}"
+COTURN_IMAGE = ("coturn/coturn:4.6.3-alpine@sha256:"
+                "e2bca2f79a4269d7240de5872ab60a9305013ad37296d2acf14f9510874346be")
 
 
 def run(*cmd, check=True, timeout=120, env=None):
@@ -42,6 +45,8 @@ def variables(project, **overrides):
         "talk_public_ipv4": "",
         "talk_signaling_config_owner": pwd.getpwuid(os.getuid()).pw_name,
         "talk_signaling_config_group": str(os.getgid()),
+        "talk_coturn_config_owner": pwd.getpwuid(os.getuid()).pw_name,
+        "talk_coturn_config_group": str(os.getgid()),
         "talk_session_hashkey": secrets.token_hex(32),
         "talk_session_blockkey": secrets.token_hex(16),
         "talk_internal_secret": secrets.token_hex(32),
@@ -53,7 +58,7 @@ def variables(project, **overrides):
     return args
 
 
-def render(parent, config, expected_success=True):
+def render(parent, config, expected_success=True, extra_env=None):
     project = Path(config["talk_project_dir"])
     parent.mkdir(parents=True, exist_ok=True)
     varfile = parent / f"vars-{uuid.uuid4().hex}.json"
@@ -61,6 +66,8 @@ def render(parent, config, expected_success=True):
     varfile.chmod(0o600)
     env = os.environ.copy()
     env["ANSIBLE_ROLES_PATH"] = str(ROOT / "roles")
+    if extra_env:
+        env.update(extra_env)
     try:
         result = run(
             "ansible-playbook", "-i", "localhost,", "-c", "local",
@@ -109,6 +116,12 @@ class RenderedRoleTests(unittest.TestCase):
         cfg = config_for(self.project)
         janus = cfg["services"]["janus"]
         self.assertEqual(janus["image"], IMAGE)
+        self.assertEqual(cfg["services"]["spreedbackend"]["image"],
+                         "ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d@sha256:"
+                         "a1924bbdae832f596568f11965a3a28695867d2557c1793d0919077d0c803c54")
+        self.assertEqual(cfg["services"]["nats"]["image"],
+                         "nats:2-alpine@sha256:"
+                         "7ae34c25dfd6fe2e01c6483eabef20d796690fdcac6c4d94ca780a6cf9877fde")
         self.assertEqual(janus["command"], ["--full-trickle"])
         self.assertTrue(janus["read_only"])
         self.assertNotIn("network_mode", janus)
@@ -180,7 +193,7 @@ class RenderedRoleTests(unittest.TestCase):
         args = variables(
             project, talk_public_ipv4="192.0.2.10",
             talk_manage_coturn=True,
-            talk_coturn_image="coturn/coturn:4.6.3-alpine@sha256:" + "1" * 64,
+            talk_coturn_image=COTURN_IMAGE,
             talk_turn_realm="turn.example.invalid",
             talk_turn_servers=["turn:turn.example.invalid:3478?transport=udp"],
             talk_turn_shared_secret=secrets.token_hex(32),
@@ -190,7 +203,7 @@ class RenderedRoleTests(unittest.TestCase):
         cfg = config_for(project)
         self.assertIn("coturn", cfg["services"])
         self.assertIn("[turn]\n", (project / "server.conf").read_text())
-        self.assertEqual((project / "turnserver.conf").stat().st_mode & 0o777, 0o600)
+        self.assertEqual((project / "turnserver.conf").stat().st_mode & 0o777, 0o640)
 
     def test_role_disabled_by_default_does_nothing(self):
         project = self.parent / "disabled"
@@ -204,6 +217,12 @@ class RenderedRoleTests(unittest.TestCase):
             {"talk_nats_url": "nats://nats:4222\n[backend]\nallowall = true"},
             {"talk_max_stream_bitrate": "1048576\n[backend]\nallowall = true"},
             {"talk_max_screen_bitrate": "2097152\n[backend]\nallowall = true"},
+            {"talk_turn_api_key": "A" * 32 + "\n[backend]\nallowall = true",
+             "talk_turn_servers": ["turn:example.com:3478?transport=udp"],
+             "talk_turn_shared_secret": secrets.token_hex(32)},
+            {"talk_turn_shared_secret": "B" * 40 + "\n[backend]\nallowall = true",
+             "talk_turn_servers": ["turn:example.com:3478?transport=udp"],
+             "talk_turn_api_key": secrets.token_hex(16)},
             {"talk_turn_servers": ["turn:example.com:3478?transport=udp\n[backend]\nallowall = true"],
              "talk_turn_api_key": secrets.token_hex(16),
              "talk_turn_shared_secret": secrets.token_hex(32)},
@@ -218,6 +237,63 @@ class RenderedRoleTests(unittest.TestCase):
                expected_success=False)
         render(self.parent, variables(self.parent / "bad-service-port", talk_signaling_port=70000),
                expected_success=False)
+
+    def test_invalid_turn_realm_and_nats_port_rejected(self):
+        render(self.parent, variables(self.parent / "invalid-nats-port",
+               talk_nats_url="nats://nats:99999"), expected_success=False)
+        args = variables(self.parent / "invalid-turn-realm", talk_manage_coturn=True,
+                         talk_coturn_image=COTURN_IMAGE,
+                         talk_turn_realm="example.invalid\nno-auth", talk_public_ipv4="192.0.2.10",
+                         talk_turn_servers=["turn:turn.example.invalid:3478?transport=udp"],
+                         talk_turn_api_key=secrets.token_hex(16),
+                         talk_turn_shared_secret=secrets.token_hex(32))
+        render(self.parent, args, expected_success=False)
+
+    def test_mutable_signaling_and_nats_images_rejected(self):
+        for key, image in (
+            ("spreed_image", "ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d"),
+            ("nats_image", "nats:2-alpine"),
+        ):
+            with self.subTest(image=image):
+                render(self.parent, variables(self.parent / f"unpinned-{key}", **{key: image}),
+                       expected_success=False)
+
+    def test_deploy_recreates_only_when_rendered_configuration_changes(self):
+        project = self.parent / "reconcile"
+        bin_dir = self.parent / "mock-bin"
+        bin_dir.mkdir(exist_ok=True)
+        log = self.parent / "compose-commands.log"
+        executable = shutil.which("docker")
+        if not executable:
+            self.skipTest("Docker is required")
+        wrapper = bin_dir / "docker"
+        wrapper.write_text(
+            f"""#!/bin/sh
+for arg in "$@"; do
+    if [ "$arg" = up ]; then
+        printf '%s\\n' "$*" >> "$TALK_COMPOSE_AUDIT_LOG"
+        printf 'Container test Recreated\\n' >&2
+        exit 0
+    fi
+done
+exec "{executable}" "$@"
+"""
+        )
+        wrapper.chmod(0o755)
+        extra_env = {
+            "PATH": str(bin_dir) + os.pathsep + os.environ["PATH"],
+            "TALK_COMPOSE_AUDIT_LOG": str(log),
+        }
+        config = variables(project, talk_compose_up=True)
+        render(self.parent, config, extra_env=extra_env)
+        render(self.parent, config, extra_env=extra_env)
+        config["janus_event_queue_limit"] = 3000
+        render(self.parent, config, extra_env=extra_env)
+        render(self.parent, config, extra_env=extra_env)
+        calls = log.read_text().splitlines()
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(["--force-recreate" in call for call in calls],
+                         [True, False, True, False])
 
     def test_invalid_ip_rejected(self):
         args = variables(self.parent / "invalid-ip", talk_public_ipv4="999.999.999.999")
@@ -298,6 +374,42 @@ class ContainerIntegrationTests(unittest.TestCase):
         raise AssertionError(
             f"Timed out waiting for {service}: {markers!r}\n" + logs[-3500:]
         )
+
+    def test_optional_coturn_starts_with_readable_protected_config(self):
+        with tempfile.TemporaryDirectory(prefix="talk-role-turn-") as temp:
+            project = Path(temp) / "turn"
+            name = f"talkturn{uuid.uuid4().hex[:10]}"
+            container_name = name + "-coturn"
+            cfg = variables(
+                project, talk_public_ipv4="192.0.2.10", talk_manage_coturn=True,
+                talk_coturn_image=COTURN_IMAGE, talk_turn_realm="turn.example.invalid",
+                talk_turn_servers=["turn:turn.example.invalid:3478?transport=udp"],
+                talk_turn_api_key=secrets.token_hex(16),
+                talk_turn_shared_secret=secrets.token_hex(32),
+            )
+            render(Path(temp), cfg)
+            # Host runner is not root: isolate chgrp to a disposable test file.
+            # Official image uses GID 65533 (nogroup), not host's nogroup ID.
+            run("docker", "run", "--rm", "--user", "0:0", "--entrypoint", "chgrp",
+                "-v", f"{project}:/hpb", "busybox:1.37", "65533",
+                "/hpb/turnserver.conf", timeout=100)
+            compose = ["docker", "compose", "-p", name,
+                       "-f", project / "docker-compose.yml"]
+            try:
+                proof = run(*compose, "run", "--no-deps", "--rm",
+                            "--entrypoint", "/bin/sh", "coturn", "-c",
+                            "test -r /etc/turnserver.conf && echo COTURN_CONFIG_READABLE",
+                            timeout=150)
+                self.assertIn("COTURN_CONFIG_READABLE", proof.stdout)
+                run(*compose, "run", "--no-deps", "-d", "--name", container_name,
+                    "coturn", timeout=180)
+                time.sleep(3)
+                status = run("docker", "inspect", "--format", "{{.State.Running}}",
+                             container_name).stdout.strip()
+                self.assertEqual(status, "true")
+            finally:
+                run("docker", "rm", "-f", container_name, check=False)
+                run(*compose, "down", "--volumes", "--remove-orphans", check=False)
 
     def test_signaling_janus_events_and_media(self):
         self.wait_for(

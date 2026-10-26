@@ -12,7 +12,8 @@ Docker Compose v2. It **does not install Docker** and does **nothing** unless
 
 The default is the **dated, validated 25 October 2026** version
 `1.4.3-r1` pinned to OCI digest. Review current releases before deploying;
-never replace this with `latest` or rely only on a mutable tag.
+never replace this with `latest` or rely only on a mutable tag. Signaling and
+NATS images are also pinned to their validated OCI digests.
 
 ## Prerequisites
 
@@ -101,6 +102,11 @@ The optional `talk_manage_coturn` is disabled by default. It requires
 `talk_coturn_image`, `talk_turn_realm`, TURN credentials, public IPv4 and
 relay ports; it is a non-TLS example, not automatic TURNS certificate
 provisioning. For real TLS TURN use an independently configured service.
+The tested `coturn/coturn:4.6.3-alpine` image runs as UID 65534/GID 65533;
+`turnserver.conf` defaults to `root:65533` mode `0640` so the secret stays
+private while remaining readable by Coturn. Review these IDs when changing
+images. Running a container alone does not prove authenticated relay works;
+validate TURN from separate networks before production use.
 
 ## Apply, test, rollback
 
@@ -108,6 +114,17 @@ Set `talk_compose_up: false` to render and validate files without running
 containers, even with `talk_deploy_enabled: true`. When enabled, the role
 runs `docker compose up -d --no-build --pull missing` and never builds
 an image in production.
+Updates to mounted Janus, signaling or TURN configuration recreate the HPB
+containers so settings take effect. Schedule these changes when calls are
+not active. An unchanged rendering does not force a restart; Compose
+still reconciles missing services.
+
+Deploy this role into a dedicated Compose project, not a shared stack. It
+will not automatically delete old containers or secrets. Disabling managed
+Coturn does **not** stop an orphaned Coturn container from an earlier
+configuration; plan explicit removal and protected secret cleanup after
+verifying that existing calls do not depend on that service. Do not apply
+`--remove-orphans` to unrelated shared projects.
 
 Generated files under `talk_project_dir`:
 
@@ -117,6 +134,7 @@ server.conf
 volumes/janus/config/janus.jcfg
 volumes/janus/config/janus.transport.websockets.jcfg
 volumes/janus/config/janus.eventhandler.wsevh.jcfg
+turnserver.conf  # only when talk_manage_coturn is enabled
 ```
 
 After deployment, inspect:
@@ -143,4 +161,6 @@ fallback and reconnection between real users in different networks.
 rendered configs, Compose semantics, idempotency, secret handling and
 negative cases. In CI, an isolated Janus/signaling/NATS deployment
 exercises real synthetic WebRTC audio/video with two clients and reconnects
-signaling. No production host or credentials are used.
+signaling. The optional Coturn test verifies actual non-root access to
+its protected configuration and successful container startup. No production
+host or credentials are used.

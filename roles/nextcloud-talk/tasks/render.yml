@@ -22,6 +22,7 @@
     - {src: janus.jcfg.j2, dest: volumes/janus/config/janus.jcfg}
     - {src: janus.transport.websockets.jcfg.j2, dest: volumes/janus/config/janus.transport.websockets.jcfg}
     - {src: janus.eventhandler.wsevh.jcfg.j2, dest: volumes/janus/config/janus.eventhandler.wsevh.jcfg}
+  register: talk_general_templates
 
 - name: Render signaling configuration without exposing secrets
   ansible.builtin.template:
@@ -30,14 +31,17 @@
     owner: "{{ talk_signaling_config_owner }}"
     group: "{{ talk_signaling_config_group }}"
     mode: "0640"
+  register: talk_signaling_template
   no_log: true
 
 - name: Render optional managed TURN configuration
   ansible.builtin.template:
     src: turnserver.conf.j2
     dest: "{{ talk_project_dir }}/turnserver.conf"
-    owner: "{{ talk_signaling_config_owner }}"
-    mode: "0600"
+    owner: "{{ talk_coturn_config_owner }}"
+    group: "{{ talk_coturn_config_group }}"
+    mode: "0640"
+  register: talk_turn_template
   no_log: true
   when: talk_manage_coturn | bool
 

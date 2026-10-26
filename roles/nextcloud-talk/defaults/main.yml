@@ -8,8 +8,8 @@ talk_project_dir: /opt/nextcloud-talk-hpb
 
 # Versioned artifacts. Review releases before changing the production digest.
 janus_image: "ghcr.io/librecodecoop/janus:1.4.3-r1@sha256:7d9c1bd28bdbc7702de924ed8a676f5c1f11afa3abc888654d8d4fc8b78a00d2"
-spreed_image: "ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d"
-nats_image: "nats:2-alpine"
+spreed_image: "ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d@sha256:a1924bbdae832f596568f11965a3a28695867d2557c1793d0919077d0c803c54"
+nats_image: "nats:2-alpine@sha256:7ae34c25dfd6fe2e01c6483eabef20d796690fdcac6c4d94ca780a6cf9877fde"
 
 # Must be configured per deployment. Never put credentials in Git.
 talk_nextcloud_url: ""
@@ -51,6 +51,9 @@ talk_turn_shared_secret: ""
 # Optional standalone Coturn (no TLS). Configure another TURN solution if preferred.
 talk_manage_coturn: false
 talk_coturn_image: ""
+# Official coturn/coturn image runs as nobody:nogroup (UID 65534, GID 65533).
+talk_coturn_config_owner: "root"
+talk_coturn_config_group: "65533"
 talk_turn_realm: ""
 talk_coturn_port: 3478
 talk_turn_relay_start: 50000
