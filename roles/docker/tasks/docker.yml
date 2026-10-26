@@ -1,85 +1,88 @@
+---
+- name: Validate supported Docker platforms
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution in ['Debian', 'Ubuntu', 'RedHat', 'Rocky', 'AlmaLinux']
+      - ansible_architecture in ['x86_64', 'aarch64']
+      - docker_group_users is sequence
+      - docker_group_users is not string
+      - docker_group_users | length == 0 or docker_manage_group_membership | bool
+    fail_msg: Unsupported platform or group configuration; see roles/docker/README.md.
 
-
-- name: Definir arquitetura corrigida para Docker
+- name: Set Docker package architecture
   ansible.builtin.set_fact:
-    docker_architecture: "{% if ansible_architecture == 'x86_64' %}amd64{% else %}{{ ansible_architecture }}{% endif %}"
+    docker_deb_architecture: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_architecture] }}"
 
-- name: Install required system packages (Debian-based)
+- name: Install Debian repository prerequisites
   ansible.builtin.apt:
     name:
-      - apt-transport-https
       - ca-certificates
-      - curl
-      - gnupg
-      - lsb-release
-    state: latest
-    update_cache: yes
-  when: ansible_os_family == "Debian"
-
-- name: Install required system packages (Red Hat-based)
-  ansible.builtin.yum:
-    name:
-      - yum-utils
-      #- device-mapper-persistent-data
-      #- lvm2
-    state: latest
-    update_cache: yes
-  when: ansible_os_family == "RedHat"
-
-- name: Add Docker GPG key (Debian-based)
-  ansible.builtin.apt_key:
-    url: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
+      - python3-debian
     state: present
-  when: ansible_os_family == "Debian"
+    update_cache: true
+  when: ansible_os_family == 'Debian'
 
-- name: Add Docker repository (Debian-based)
-  ansible.builtin.apt_repository:
-    repo: "deb [arch={{ docker_architecture }}] https://download.docker.com/linux/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} stable"
+- name: Configure Docker's signed Debian repository
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: "https://download.docker.com/linux/{{ ansible_distribution | lower }}"
+    suites: ["{{ ansible_distribution_release }}"]
+    components: [stable]
+    architectures: ["{{ docker_deb_architecture }}"]
+    signed_by: "https://download.docker.com/linux/{{ ansible_distribution | lower }}/gpg"
     state: present
-    filename: docker
-  when: ansible_os_family == "Debian"
+    enabled: true
+  when: ansible_os_family == 'Debian'
+  register: docker_repository_deb
 
-- name: Add Docker repository (Red Hat-based)
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/centos/docker-ce.repo
-    dest: /etc/yum.repos.d/docker-ce.repo
-  when: ansible_os_family == "RedHat"
+- name: Choose Docker RPM repository for the detected platform
+  ansible.builtin.set_fact:
+    docker_rpm_upstream: "{{ 'rhel' if ansible_distribution == 'RedHat' else 'centos' }}"
+  when: ansible_os_family == 'RedHat'
 
-- name: Install Docker (Debian-based)
+- name: Configure Docker's signed RPM repository
+  ansible.builtin.yum_repository:
+    name: docker-ce-stable
+    description: Docker CE Stable
+    baseurl: "https://download.docker.com/linux/{{ docker_rpm_upstream }}/$releasever/$basearch/stable"
+    gpgcheck: true
+    repo_gpgcheck: false
+    gpgkey: "https://download.docker.com/linux/{{ docker_rpm_upstream }}/gpg"
+    enabled: true
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install Docker Engine and Compose plugin on Debian
   ansible.builtin.apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: latest
-    update_cache: yes
-  when: ansible_os_family == "Debian"
+    name: "{{ docker_packages }}"
+    state: "{{ 'latest' if docker_update_packages | bool else 'present' }}"
+    update_cache: true
+  when: ansible_os_family == 'Debian'
 
-- name: Install Docker (Red Hat-based)
-  ansible.builtin.yum:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-compose-plugin
-    state: latest
-    update_cache: yes
-  when: ansible_os_family == "RedHat"
+- name: Install Docker Engine and Compose plugin on RPM systems
+  ansible.builtin.dnf:
+    name: "{{ docker_packages }}"
+    state: "{{ 'latest' if docker_update_packages | bool else 'present' }}"
+    update_cache: true
+  when: ansible_os_family == 'RedHat'
 
-- name: Start and enable Docker service
+- name: Enable and start Docker Engine
   ansible.builtin.service:
     name: docker
-    enabled: yes
     state: started
+    enabled: true
 
-- name: Create docker group
+- name: Ensure Docker access group exists
   ansible.builtin.group:
-    name: "docker"
+    name: docker
     state: present
+  when: docker_manage_group_membership | bool
 
-- name: Add user to docker group
+- name: Authorize selected accounts to control Docker Engine
   ansible.builtin.user:
-    name: "{{ ansible_user }}"
-    groups: "docker"
-    append: yes
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_group_users }}"
+  when: docker_manage_group_membership | bool
