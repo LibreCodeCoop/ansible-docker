@@ -121,7 +121,13 @@ class RenderedRoleTests(unittest.TestCase):
             {"janus.jcfg", "janus.transport.websockets.jcfg", "janus.eventhandler.wsevh.jcfg"},
         )
         self.assertTrue(all(v["read_only"] for v in janus["volumes"]))
-        self.assertTrue(all(not v["bind"]["create_host_path"] for v in janus["volumes"]))
+        # Compose v2 versions differ: explicit false can normalize to absent.
+        self.assertTrue(all(
+            not v.get("bind", {}).get("create_host_path", False)
+            for v in janus["volumes"]
+        ))
+        source = (self.project / "docker-compose.yml").read_text()
+        self.assertEqual(source.count("create_host_path: false"), 4)
         self.assertEqual(set(cfg["services"]), {"janus", "nats", "spreedbackend"})
         self.assertEqual(set(cfg["services"]["spreedbackend"]["networks"]), {"hpb"})
         self.assertFalse(cfg["services"]["spreedbackend"].get("ports"))
