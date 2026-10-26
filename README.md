@@ -53,3 +53,15 @@ ansible-playbook playbook.yml -v \
 - Utilizando outra chave para se conectar aos hosts, defina `--key-file chave-ssh`:
 
     - `ansible-playbook --inventory hosts.yml --key-file chave-ssh requirements-playbook.yml`
+## Nextcloud maintenance
+
+The former root-level nextcloud-update.yml was removed because it performed
+host-wide Docker resource pruning, including unused volumes, before an update.
+It also contained unreviewed application-specific lifecycle operations. Do
+not restore or execute that workflow.
+
+Perform Nextcloud upgrades through a separately reviewed and tested
+operational playbook in the private infrastructure-operations repository, with
+documented backups, rollout windows, rollback, and explicit approval for each
+target host. The existence of that repository does not mean its playbooks
+are automatically approved for production.
