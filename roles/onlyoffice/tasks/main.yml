@@ -4,11 +4,28 @@
     cmd: docker compose version
   register: onlyoffice_compose_version
   changed_when: false
+  failed_when: false
   when: onlyoffice_validate_prerequisites | bool
 
 - name: Require a working Compose v2 installation
   ansible.builtin.assert:
     that:
       - onlyoffice_compose_version.rc == 0
-    fail_msg: "Install the docker role before configuring OnlyOffice."
+    fail_msg: "Docker Compose v2 is unavailable. Provision Docker Engine using the docker role first."
+  when: onlyoffice_validate_prerequisites | bool
+
+- name: Verify Docker daemon is accessible
+  ansible.builtin.command:
+    cmd: docker info
+  register: onlyoffice_docker_info
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: onlyoffice_validate_prerequisites | bool
+
+- name: Require Docker Engine access
+  ansible.builtin.assert:
+    that:
+      - onlyoffice_docker_info.rc == 0
+    fail_msg: Docker daemon is unavailable to the Ansible execution user.
   when: onlyoffice_validate_prerequisites | bool

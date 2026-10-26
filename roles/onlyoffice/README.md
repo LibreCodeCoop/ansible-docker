@@ -2,7 +2,7 @@
 
 ## Status and prerequisites
 
-This role checks for Docker Compose v2; it does not install Docker, deploy
+This role checks for Docker Compose v2 and Docker Engine access; it does not install Docker, deploy
 OnlyOffice, restart containers or migrate any data. The earlier implementation
 only installed Docker and notified a non-existent restart handler: it did not
 deploy the provided Compose template. We deliberately do not silently begin
