@@ -1,0 +1,30 @@
+name: docker role validation
+
+on:
+  pull_request:
+    paths:
+      - 'roles/docker/**'
+      - '.github/workflows/docker-role-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'roles/docker/**'
+      - '.github/workflows/docker-role-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install Ansible QA dependencies
+        run: |
+          python3 -m venv /tmp/ansible-qa
+          /tmp/ansible-qa/bin/pip install 'ansible-core>=2.17,<2.21' 'ansible-lint>=24,<27'
+      - name: Validate role syntax and lint
+        run: |
+          export ANSIBLE_ROLES_PATH="$GITHUB_WORKSPACE/roles"
+          /tmp/ansible-qa/bin/ansible-playbook -i localhost, roles/docker/tests/syntax.yml --syntax-check
+          /tmp/ansible-qa/bin/ansible-lint --offline roles/docker

@@ -1,0 +1,7 @@
+---
+- name: Validate docker role syntax
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - docker
