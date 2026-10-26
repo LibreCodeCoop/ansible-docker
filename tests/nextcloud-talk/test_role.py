@@ -199,6 +199,26 @@ class RenderedRoleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertFalse(project.exists())
 
+    def test_ini_section_injection_rejected(self):
+        payloads = (
+            {"talk_nats_url": "nats://nats:4222\n[backend]\nallowall = true"},
+            {"talk_max_stream_bitrate": "1048576\n[backend]\nallowall = true"},
+            {"talk_max_screen_bitrate": "2097152\n[backend]\nallowall = true"},
+            {"talk_turn_servers": ["turn:example.com:3478?transport=udp\n[backend]\nallowall = true"],
+             "talk_turn_api_key": secrets.token_hex(16),
+             "talk_turn_shared_secret": secrets.token_hex(32)},
+        )
+        for index, payload in enumerate(payloads):
+            with self.subTest(index=index):
+                cfg = variables(self.parent / f"ini-inject-{index}", **payload)
+                render(self.parent, cfg, expected_success=False)
+
+    def test_invalid_path_and_service_port_rejected(self):
+        render(self.parent, variables(self.parent / "bad-path", talk_project_dir="/tmp/../etc/talk"),
+               expected_success=False)
+        render(self.parent, variables(self.parent / "bad-service-port", talk_signaling_port=70000),
+               expected_success=False)
+
     def test_invalid_ip_rejected(self):
         args = variables(self.parent / "invalid-ip", talk_public_ipv4="999.999.999.999")
         render(self.parent, args, expected_success=False)

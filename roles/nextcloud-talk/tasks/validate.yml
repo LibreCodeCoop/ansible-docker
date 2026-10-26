@@ -14,6 +14,18 @@
       - talk_project_dir not in ['/','/tmp','/etc','/root']
       - talk_reverse_proxy_network == '' or talk_reverse_proxy_network is match('^[a-zA-Z0-9_-]+$')
       - talk_backend_id is match('^[a-zA-Z][a-zA-Z0-9_-]+$')
+      - talk_nats_url is match('^nats://[a-zA-Z0-9.-]+:[0-9]{1,5}$')
+      - talk_letsencrypt_email == '' or talk_letsencrypt_email is match('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+      - (talk_max_stream_bitrate | string) is match('^[0-9]{1,10}$')
+      - (talk_max_stream_bitrate | int) > 0
+      - (talk_max_screen_bitrate | string) is match('^[0-9]{1,10}$')
+      - (talk_max_screen_bitrate | int) > 0
+      - "'..' not in talk_project_dir.split('/')"
+      - (talk_signaling_port | int) <= 65535
+      - (janus_websocket_port | int) <= 65535
+      - (talk_coturn_port | int) >= 1024
+      - (talk_coturn_port | int) <= 65535
+      - talk_turn_servers | select('match', '^turns?:[A-Za-z0-9.-]+(:[0-9]{1,5})?(\?transport=(udp|tcp))?$') | list | length == talk_turn_servers | length
       - (janus_rtp_port_start | int) >= 1024
       - (janus_rtp_port_end | int) <= 65535
       - (janus_rtp_port_start | int) <= (janus_rtp_port_end | int)
