@@ -49,3 +49,9 @@ Changing apt/rpm repositories and upgrading Docker may restart services.
 Schedule upgrades and rollback using a tested OS package snapshot/version
 rollback, never by deleting /var/lib/docker. Check mode may not know remote
 repository/key state on a fresh host, so it is not a replacement for a VM test.
+
+The unused Nginx Compose sample under the Docker role, its empty handler and
+directory placeholder, and its empty vars file were removed because Docker
+provisioning does not own or deploy Nginx. If a downstream playbook imported
+the old template directly, update it to the application-specific deployment
+role before upgrading this role.

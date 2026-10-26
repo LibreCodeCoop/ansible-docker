@@ -36,14 +36,19 @@
   when: ansible_os_family == 'Debian'
   register: docker_repository_deb
 
+- name: Choose Docker RPM repository for the detected platform
+  ansible.builtin.set_fact:
+    docker_rpm_upstream: "{{ 'rhel' if ansible_distribution == 'RedHat' else 'centos' }}"
+  when: ansible_os_family == 'RedHat'
+
 - name: Configure Docker's signed RPM repository
   ansible.builtin.yum_repository:
     name: docker-ce-stable
     description: Docker CE Stable
-    baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+    baseurl: "https://download.docker.com/linux/{{ docker_rpm_upstream }}/$releasever/$basearch/stable"
     gpgcheck: true
     repo_gpgcheck: false
-    gpgkey: https://download.docker.com/linux/centos/gpg
+    gpgkey: "https://download.docker.com/linux/{{ docker_rpm_upstream }}/gpg"
     enabled: true
     state: present
   when: ansible_os_family == 'RedHat'
