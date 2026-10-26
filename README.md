@@ -65,3 +65,11 @@ operational playbook in the private infrastructure-operations repository, with
 documented backups, rollout windows, rollback, and explicit approval for each
 target host. The existence of that repository does not mean its playbooks
 are automatically approved for production.
+
+## SSH host authentication
+
+This repository enables SSH host key verification by default to prevent
+man-in-the-middle attacks. Provision trusted host keys in the operator's
+known_hosts before connecting. Do not disable verification globally as
+a workaround. The shared ansible.cfg is versioned; use inventory and
+external Vault-protected settings for environment-specific configuration.
