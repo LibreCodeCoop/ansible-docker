@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Nextcloud Talk HPB role
+on:
+  push:
+    branches: [main]
+    paths:
+      - roles/nextcloud-talk/**
+      - tests/nextcloud-talk/**
+      - .github/workflows/talk-hpb-ci.yml
+  pull_request:
+    paths:
+      - roles/nextcloud-talk/**
+      - tests/nextcloud-talk/**
+      - .github/workflows/talk-hpb-ci.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Ansible Core
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install 'ansible-core>=2.18,<2.22'
+      - name: Syntax, render, and isolated Janus/WebRTC integration
+        run: |
+          . .venv/bin/activate
+          export ANSIBLE_ROLES_PATH="$PWD/roles"
+          ansible-playbook -i localhost, -c local --syntax-check tests/nextcloud-talk/render.yml
+          RUN_HPB_INTEGRATION=1 python -m unittest discover -s tests/nextcloud-talk -p 'test_*.py' -v

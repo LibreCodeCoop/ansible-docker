@@ -1,29 +1,14 @@
-
-listening-port=3478
-tls-listening-port=5349
-min-port=49152
-max-port=65535
-verbose
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Optional managed Coturn. TLS TURN should use dedicated certificate provisioning.
+listening-port={{ talk_coturn_port }}
+min-port={{ talk_turn_relay_start }}
+max-port={{ talk_turn_relay_end }}
+realm={{ talk_turn_realm }}
+external-ip={{ talk_public_ipv4 }}
 fingerprint
 use-auth-secret
-
-
-static-auth-secret={{ turn_secret }}
-
-realm={{ nextcloud_url }}
-
-cert=/etc/ssl/certs/cert.pem
-
-pkey=/etc/ssl/private/privkey.pem
-
-syslog
-
-#cli-ip=127.0.0.1
-#cli-port=5766
-#cli-password=CHANGE_ME
-
-no-rfc5780
-
-no-stun-backward-compatibility
-
-response-origin-only-with-rfc5780
+static-auth-secret={{ talk_turn_shared_secret }}
+no-cli
+no-loopback-peers
+no-multicast-peers

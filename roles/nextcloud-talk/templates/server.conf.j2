@@ -1,50 +1,41 @@
+; SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+; SPDX-License-Identifier: AGPL-3.0-or-later
+; Private configuration: supplied only from Ansible Vault, stored with mode 0640.
 [http]
-listen = 0.0.0.0:8080
+listen = 0.0.0.0:{{ talk_signaling_port }}
 
 [app]
 debug = false
-trustedproxies = 172.19.0.1/16
 
 [sessions]
-hashkey = 8766830f88a5084dc7eda39b5887407029e66e423a6d0aa1ecd6dc8fcc530bd5
-blockkey = fcc1f15c4e0395174a6ec29b1415c881
+hashkey = {{ talk_session_hashkey }}
+blockkey = {{ talk_session_blockkey }}
 
 [clients]
-internalsecret = f3d98d6611c8dce8c8f71c565685d819c2839c1e6d26525c3c6f23b782efb947
+internalsecret = {{ talk_internal_secret }}
 
 [backend]
-backends = backend
+backends = {{ talk_backend_id }}
 allowall = false
 timeout = 20
 connectionsperhost = 40
 
-[backend]
-url = https://{{ nextcloud_url }}
-secret = {{ backend_secret}}
+[{{ talk_backend_id }}]
+urls = {{ talk_nextcloud_url }}
+secret = {{ talk_backend_secret }}
 
 [nats]
-url = nats://{{ nextcloud_url }}:4222
+url = {{ talk_nats_url }}
 
 [mcu]
 type = janus
-url = ws://{{ nextcloud_url }}.br:8188
-maxstreambitrate = 1048576
-maxscreenbitrate = 2097152
+url = ws://janus:{{ janus_websocket_port }}/
+maxstreambitrate = {{ talk_max_stream_bitrate }}
+maxscreenbitrate = {{ talk_max_screen_bitrate }}
 
+{% if talk_turn_servers | length > 0 %}
 [turn]
-apikey = 94896fe6-b059-4415-baf3-bc544e3b93cd
-secret = {{ turn_secret }}
-servers = turn:{{ nextcloud_url }}:3478?transport=udp,turn:{{ nextcloud_url }}:3478?transport=tcp
-
-[geoip]
-
-[geoip-overrides]
-
-[continent-overrides]
-
-[stats]
-
-[etcd]
-
-[grpc]
-
+apikey = {{ talk_turn_api_key }}
+secret = {{ talk_turn_shared_secret }}
+servers = {{ talk_turn_servers | join(',') }}
+{% endif %}

@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+---
+- name: Require explicit production image and valid network configuration
+  ansible.builtin.assert:
+    that:
+      - janus_image is match('^ghcr\.io/librecodecoop/janus:[0-9]+\.[0-9]+\.[0-9]+-r[0-9]+@sha256:[0-9a-f]{64}$')
+      - spreed_image is match('^[a-zA-Z0-9./_-]+:[a-zA-Z0-9._-]+(@sha256:[0-9a-f]{64})?$')
+      - not (spreed_image is search(':latest($|@)'))
+      - talk_nextcloud_url is match('^https://[A-Za-z0-9.-]+(:[0-9]+)?(/[^ ]*)?$')
+      - talk_public_ipv4 == '' or talk_public_ipv4 is match('^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])[.]){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$')
+      - talk_signaling_hostname is match('^[a-zA-Z0-9.-]+$')
+      - talk_project_dir is match('^/[^ \r\n]+$')
+      - talk_project_dir not in ['/','/tmp','/etc','/root']
+      - talk_reverse_proxy_network == '' or talk_reverse_proxy_network is match('^[a-zA-Z0-9_-]+$')
+      - talk_backend_id is match('^[a-zA-Z][a-zA-Z0-9_-]+$')
+      - (janus_rtp_port_start | int) >= 1024
+      - (janus_rtp_port_end | int) <= 65535
+      - (janus_rtp_port_start | int) <= (janus_rtp_port_end | int)
+      - ((janus_rtp_port_end | int) - (janus_rtp_port_start | int)) <= 1000
+      - (janus_websocket_port | int) >= 1024
+      - (talk_signaling_port | int) >= 1024
+      - (janus_event_replay_limit | int) > 0
+      - (janus_event_queue_limit | int) >= (janus_event_replay_limit | int)
+      - (talk_turn_servers | length == 0) or ((talk_turn_api_key | length >= 16) and (talk_turn_shared_secret | length >= 32))
+      - not (talk_manage_coturn | bool) or ((talk_coturn_image is match('^[A-Za-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$')) and (talk_turn_realm | length > 0) and (talk_turn_servers | length > 0) and (talk_public_ipv4 | length > 0))
+      - (talk_turn_relay_start | int) >= 1024
+      - (talk_turn_relay_end | int) <= 65535
+      - (talk_turn_relay_start | int) <= (talk_turn_relay_end | int)
+    fail_msg: "Invalid Talk HPB settings: review role README, versioned GHCR digest, hostnames, ports, and TURN configuration."
+    quiet: true
+
+- name: Require externally supplied secrets (Ansible Vault recommended)
+  ansible.builtin.assert:
+    that:
+      - (talk_session_hashkey | length) in [32, 64]
+      - (talk_session_blockkey | length) in [16, 24, 32]
+      - (talk_internal_secret | length) >= 32
+      - (talk_backend_secret | length) >= 32
+      - talk_session_hashkey is match('^[A-Za-z0-9_-]+$')
+      - talk_session_blockkey is match('^[A-Za-z0-9_-]+$')
+      - talk_internal_secret is match('^[A-Za-z0-9_-]+$')
+      - talk_backend_secret is match('^[A-Za-z0-9_-]+$')
+    fail_msg: "Required session, internal, or backend secrets are missing or invalid. Supply fresh secrets through Ansible Vault."
+    quiet: true
+  no_log: true

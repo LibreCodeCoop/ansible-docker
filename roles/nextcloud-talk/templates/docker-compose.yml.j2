@@ -1,120 +1,108 @@
-# This file is part of LibreCodeCoop/ansible-docker
-#
-# Copyright (C) 2025 LibreCode coop <contact@librecode.coop>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>
-#
-
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Managed by Ansible. Deploy only reviewed images with immutable Janus digests.
 networks:
-  reverse-proxy:
+  hpb:
+    driver: bridge
+{% if talk_reverse_proxy_network | length > 0 %}
+  proxy:
     external: true
-    name: reverse-proxy
-  internal:
-    #external: true
-    name: internal
-  coturn-redis:
-    name: coturn-redis 
+    name: {{ talk_reverse_proxy_network | to_json }}
+{% endif %}
 
-services:     
-  spreedbackend:
-    image: {{ spreed_image }}
-    volumes:
-      - ./server.conf:/config/server.conf
-      - ./volumes/hpb/ssl/:/etc/nginx/ssl/
-      # - /root/projects/nginx-proxy/volumes/certs/cloud.henriquemohr.net.br/key.pem:/etc/nginx/ssl/server.key
-      # - /root/projects/nginx-proxy/volumes/certs/cloud.henriquemohr.net.br/fullchain.pem:/etc/nginx/ssl/server.crt
-    # network_mode: host
-    restart: unless-stopped
-    environment:
-      - JANUS_URL={{ janus_virtual_host }}
-      - USE_JANUS={{ spreed_use_janus }}
-      - VIRTUAL_HOST={{ spreed_virtual_host }}
-      - LETSENCRYPT_HOST={{ spreed_virtual_host }}
-      - LETSENCRYPT_EMAIL={{ email_le }}
-      - VIRTUAL_PORT={{ spreed_virtual_port }}
-    networks:
-      - reverse-proxy
-      - internal
-  nats:
-    image: {{ nats_image }}
-    volumes:
-      - ./gnatsd.conf:/config/gnatsd.conf
-    command: ["-c", "/config/gnatsd.conf"]
-    network_mode: host
-    restart: unless-stopped
-
+services:
   janus:
-    image: {{ janus_image }}
-    command: ["janus", "--full-trickle"]
-    network_mode: host
+    image: {{ janus_image | to_json }}
+    command:
+      - "--full-trickle"
+{% if talk_public_ipv4 | length > 0 %}
+      - {{ ('--nat-1-1=' ~ talk_public_ipv4) | to_json }}
+{% endif %}
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
-    environment:
-      - VIRTUAL_HOST={{ janus_virtual_host }}
-      - LETSENCRYPT_HOST={{ janus_virtual_host }}
-      - LETSENCRYPT_EMAIL={{ email_le }}
-
-  redis:
-    image: redis:alpine
-    restart: unless-stopped
-    #command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
-    volumes:
-      - ./volumes/redis/data:/data
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    #env_file: 
-    #  - redis/redis.env
-    networks:
-      - coturn-redis
-
-# Coturn
-  coturn:
-    image: {{ turn_image }}
-    restart: always
-    volumes:
-      - ./turnserver.conf:/etc/turnserver.conf:ro
-      - ./coturn/privkey.pem:/etc/ssl/private/privkey.pem:ro
-      - ./coturn/cert.pem:/etc/ssl/certs/cert.pem:ro
     ports:
-## STUN/TURN
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "3479:3479"
-      - "3479:3479/udp"
-        #- "80:80"
-        #- "80:80/udp"
-## STUN/TURN SSL
-      - "5349:5349"
-      - "5349:5349/udp"
-      - "5350:5350"
-      - "5350:5350/udp"
-        #- "443:443"
-        #- "443:443/udp"
-# Relay Ports
-#      - "49152-65535:49152-65535"
-#      - "49152-65535:49152-65535/udp"
-    environment:
-      - VIRTUAL_HOST={{ turn_virtual_host }}
-      - LETSENCRYPT_HOST={{ turn_virtual_host }}
-      - LETSENCRYPT_EMAIL={{ email_le }}
-      - VIRTUAL_PORT={{ turn_virtual_port }}
+      - {{ ((janus_rtp_port_start | string) ~ '-' ~ (janus_rtp_port_end | string) ~ ':' ~ (janus_rtp_port_start | string) ~ '-' ~ (janus_rtp_port_end | string) ~ '/udp') | to_json }}
     networks:
-      - internal
-      - coturn-redis
-      - reverse-proxy
+      - hpb
+    volumes:
+      - type: bind
+        source: ./volumes/janus/config/janus.jcfg
+        target: /usr/local/etc/janus/janus.jcfg
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./volumes/janus/config/janus.transport.websockets.jcfg
+        target: /usr/local/etc/janus/janus.transport.websockets.jcfg
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./volumes/janus/config/janus.eventhandler.wsevh.jcfg
+        target: /usr/local/etc/janus/janus.eventhandler.wsevh.jcfg
+        read_only: true
+        bind:
+          create_host_path: false
+
+  nats:
+    image: {{ nats_image | to_json }}
+    restart: unless-stopped
+    networks:
+      - hpb
+
+  spreedbackend:
+    image: {{ spreed_image | to_json }}
+    environment:
+      CONFIG: /config/server.conf
+{% if talk_reverse_proxy_network | length > 0 %}
+      VIRTUAL_HOST: {{ talk_signaling_hostname | to_json }}
+      LETSENCRYPT_HOST: {{ talk_signaling_hostname | to_json }}
+      LETSENCRYPT_EMAIL: {{ talk_letsencrypt_email | to_json }}
+      VIRTUAL_PORT: {{ (talk_signaling_port | string) | to_json }}
+{% endif %}
     depends_on:
-      - redis
+      - nats
+      - janus
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      - hpb
+{% if talk_reverse_proxy_network | length > 0 %}
+      - proxy
+{% endif %}
+    volumes:
+      - type: bind
+        source: ./server.conf
+        target: /config/server.conf
+        read_only: true
+        bind:
+          create_host_path: false
 
-volumes:
-  redis-data:
-
+{% if talk_manage_coturn | bool %}
+  coturn:
+    image: {{ talk_coturn_image | to_json }}
+    command: ["-c", "/etc/turnserver.conf"]
+    restart: unless-stopped
+    networks:
+      - hpb
+    ports:
+      - {{ ((talk_coturn_port | string) ~ ':' ~ (talk_coturn_port | string) ~ '/udp') | to_json }}
+      - {{ ((talk_coturn_port | string) ~ ':' ~ (talk_coturn_port | string) ~ '/tcp') | to_json }}
+      - {{ ((talk_turn_relay_start | string) ~ '-' ~ (talk_turn_relay_end | string) ~ ':' ~ (talk_turn_relay_start | string) ~ '-' ~ (talk_turn_relay_end | string) ~ '/udp') | to_json }}
+    volumes:
+      - type: bind
+        source: ./turnserver.conf
+        target: /etc/turnserver.conf
+        read_only: true
+        bind:
+          create_host_path: false
+{% endif %}

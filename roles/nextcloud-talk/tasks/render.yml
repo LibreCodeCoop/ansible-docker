@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+---
+- name: Create Talk HPB configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ talk_project_dir }}"
+    - "{{ talk_project_dir }}/volumes"
+    - "{{ talk_project_dir }}/volumes/janus"
+    - "{{ talk_project_dir }}/volumes/janus/config"
+
+- name: Render Janus and Compose configurations
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ talk_project_dir }}/{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - {src: docker-compose.yml.j2, dest: docker-compose.yml}
+    - {src: janus.jcfg.j2, dest: volumes/janus/config/janus.jcfg}
+    - {src: janus.transport.websockets.jcfg.j2, dest: volumes/janus/config/janus.transport.websockets.jcfg}
+    - {src: janus.eventhandler.wsevh.jcfg.j2, dest: volumes/janus/config/janus.eventhandler.wsevh.jcfg}
+
+- name: Render signaling configuration without exposing secrets
+  ansible.builtin.template:
+    src: server.conf.j2
+    dest: "{{ talk_project_dir }}/server.conf"
+    owner: "{{ talk_signaling_config_owner }}"
+    group: "{{ talk_signaling_config_group }}"
+    mode: "0640"
+  no_log: true
+
+- name: Render optional managed TURN configuration
+  ansible.builtin.template:
+    src: turnserver.conf.j2
+    dest: "{{ talk_project_dir }}/turnserver.conf"
+    owner: "{{ talk_signaling_config_owner }}"
+    mode: "0600"
+  no_log: true
+  when: talk_manage_coturn | bool
+
+- name: Validate rendered Compose without starting containers
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - --project-directory
+      - "{{ talk_project_dir }}"
+      - -f
+      - "{{ talk_project_dir }}/docker-compose.yml"
+      - config
+      - --quiet
+  changed_when: false

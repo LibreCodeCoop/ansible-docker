@@ -3,3 +3,5 @@ ansible.cfg
 .vagrant
 ssh*
 ansible.cfg
+.venv/
+__pycache__/

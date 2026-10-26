@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+general: {
+  debug_level = 4
+}
+media: {
+  rtp_port_range = "{{ janus_rtp_port_start }}-{{ janus_rtp_port_end }}"
+}
+events: {
+  broadcast = true
+}
