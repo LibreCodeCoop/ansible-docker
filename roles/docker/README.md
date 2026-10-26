@@ -1,38 +1,51 @@
-Role Name
-=========
+# Docker Engine role
 
-A brief description of the role goes here.
+Installs Docker Engine, containerd, Buildx and the Compose v2 CLI plugin from
+Docker's upstream signed repositories. No Compose v1/Python SDK is installed.
+The role does not deploy application containers.
 
-Requirements
-------------
+## Supported targets
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+Debian and Ubuntu, or RHEL/Rocky/AlmaLinux, on x86_64 and aarch64.
+The target needs a supported distribution release, systemd and outbound HTTPS.
+Ansible Core with `ansible.builtin.deb822_repository` is required (2.15+).
+Apply with privilege escalation (`become: true`). Fedora, CentOS Stream and
+other operating systems are not claimed as supported.
 
-Role Variables
---------------
+## Configuration
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+- `docker_install_enabled`: install Docker (default `true`).
+- `docker_update_packages`: deliberately upgrade packages on subsequent runs
+  (default `false`; `present` installs missing packages without upgrading).
+- `docker_packages`: override Docker package list only with tested versions.
+- `docker_manage_group_membership`: allow management of Docker group
+  (default `false`).
+- `docker_group_users`: explicit list of trusted users, default empty.
 
-Dependencies
-------------
+Membership in the Docker group is effectively root-equivalent. By default no
+account is added. Existing membership is not revoked. Privilege changes may
+require a new login session.
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+## Playbook example
 
-Example Playbook
-----------------
+```yaml
+- name: Provision Docker hosts
+  hosts: docker_hosts
+  become: true
+  roles:
+    - role: docker
+      vars:
+        docker_update_packages: false
+        docker_manage_group_membership: false
+```
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+Validate on a disposable VM with `ansible-playbook -i inventory playbook.yml
+--check --diff` and an ordinary run. The second ordinary run should report
+no changes. Check `docker version`, `docker compose version`,
+`docker buildx version`, and `systemctl is-active docker`. Run an intentional
+upgrade separately by setting `docker_update_packages: true`.
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
-
-License
--------
-
-BSD
-
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+Changing apt/rpm repositories and upgrading Docker may restart services.
+Schedule upgrades and rollback using a tested OS package snapshot/version
+rollback, never by deleting /var/lib/docker. Check mode may not know remote
+repository/key state on a fresh host, so it is not a replacement for a VM test.
