@@ -34,3 +34,11 @@ Validate a disposable VM first and plan maintenance with an explicit per-host
 approval. For rollback, restore the previous Git ref and re-apply the reviewed
 Compose project; preserve its volumes and certificates. Container runtime
 tests, network integration and rollback are not yet automated.
+
+
+## Renamed role
+
+The previous roles/nginx-proxy path used a legacy hyphenated identifier
+that is invalid under current role naming rules. This role is now named
+nginx_proxy. Update external playbooks to reference nginx_proxy explicitly
+before adopting the new version.
