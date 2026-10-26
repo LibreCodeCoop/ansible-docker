@@ -1,0 +1,7 @@
+---
+# SPDX-License-Identifier: AGPL-3.0-or-later
+nginx_proxy_project_path: /root/projects/nginx-proxy
+nginx_proxy_network_name: reverse-proxy
+nginx_proxy_repository_url: https://github.com/LibreCodeCoop/nginx-proxy.git
+nginx_proxy_repository_ref: 9258c8afd5f1326ea97ccbcd778afbd9dab68721
+nginx_proxy_update_repository: false

@@ -1,0 +1,3 @@
+---
+- name: Configure Nginx proxy
+  ansible.builtin.import_tasks: nginx-proxy.yml

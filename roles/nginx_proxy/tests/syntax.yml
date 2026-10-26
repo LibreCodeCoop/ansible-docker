@@ -1,0 +1,7 @@
+---
+- name: Validate nginx-proxy role
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - nginx_proxy

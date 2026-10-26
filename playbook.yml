@@ -25,4 +25,4 @@
   #strategy: free
   roles:
     - role: docker
-#    - role: nginx-proxy
+#    - role: nginx_proxy
