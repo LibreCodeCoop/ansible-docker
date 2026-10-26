@@ -1,22 +1,60 @@
-# This file is part of LibreCodeCoop/ansible-docker
-#
-# Copyright (C) 2022 LibreCode coop <contact@librecode.coop>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>
-#
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 ---
-# import_controls
+# Explicit opt-in: including the role alone never installs or restarts services.
+talk_deploy_enabled: false
+talk_compose_up: true
+talk_project_dir: /opt/nextcloud-talk-hpb
 
-docker: true
-restart: true
+# Versioned artifacts. Review releases before changing the production digest.
+janus_image: "ghcr.io/librecodecoop/janus:1.4.3-r1@sha256:7d9c1bd28bdbc7702de924ed8a676f5c1f11afa3abc888654d8d4fc8b78a00d2"
+spreed_image: "ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d@sha256:a1924bbdae832f596568f11965a3a28695867d2557c1793d0919077d0c803c54"
+nats_image: "nats:2-alpine@sha256:7ae34c25dfd6fe2e01c6483eabef20d796690fdcac6c4d94ca780a6cf9877fde"
+
+# Must be configured per deployment. Never put credentials in Git.
+talk_nextcloud_url: ""
+talk_public_ipv4: ""
+talk_signaling_hostname: ""
+talk_letsencrypt_email: ""
+talk_session_hashkey: ""
+talk_session_blockkey: ""
+talk_internal_secret: ""
+talk_backend_secret: ""
+talk_backend_id: "nextcloud"
+
+# External proxy network; set to '' to keep signaling private to the stack.
+# If empty, operators must supply a separate secure ingress mechanism.
+talk_reverse_proxy_network: "reverse-proxy"
+talk_signaling_port: 8080
+talk_nats_url: "nats://nats:4222"
+talk_max_stream_bitrate: 1048576
+talk_max_screen_bitrate: 2097152
+
+# Image runs its signaling worker as UID/GID 850 (spreedbackend).
+# Sensitive server.conf is root:850, 0640 rather than world-readable.
+talk_signaling_config_group: "850"
+talk_signaling_config_owner: "root"
+
+# Public UDP media range. Set talk_public_ipv4 when a public 1:1 NAT mapping
+# is required; without it Janus advertises its container interface address.
+janus_rtp_port_start: 20000
+janus_rtp_port_end: 20100
+janus_websocket_port: 8188
+janus_event_replay_limit: 500
+janus_event_queue_limit: 2000
+
+# Optional externally managed TURN. If enabled, these are required secrets.
+talk_turn_servers: []
+talk_turn_api_key: ""
+talk_turn_shared_secret: ""
+
+# Optional standalone Coturn (no TLS). Configure another TURN solution if preferred.
+talk_manage_coturn: false
+talk_coturn_image: ""
+# Official coturn/coturn image runs as nobody:nogroup (UID 65534, GID 65533).
+talk_coturn_config_owner: "root"
+talk_coturn_config_group: "65533"
+talk_turn_realm: ""
+talk_coturn_port: 3478
+talk_turn_relay_start: 50000
+talk_turn_relay_end: 50100

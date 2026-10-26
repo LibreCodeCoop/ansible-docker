@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+FROM python:3.11-slim
+RUN pip install --no-cache-dir aiortc==1.14.0 websockets==15.0.1
+USER nobody
+WORKDIR /work
+COPY --chown=nobody:nogroup media_smoke.py /work/media_smoke.py
+ENTRYPOINT ["python", "/work/media_smoke.py"]

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+---
+- name: Validate and render an isolated Talk HPB stack
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - nextcloud-talk

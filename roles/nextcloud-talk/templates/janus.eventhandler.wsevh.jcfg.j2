@@ -1,0 +1,11 @@
+// SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+general: {
+  enabled = true
+  events = "handles,media,webrtc"
+  grouping = true
+  backend = "ws://spreedbackend:{{ talk_signaling_port }}/spreed"
+  subprotocol = "janus-events"
+  events_cap_on_reconnect = {{ janus_event_replay_limit }}
+  events_max_queue = {{ janus_event_queue_limit }}
+}

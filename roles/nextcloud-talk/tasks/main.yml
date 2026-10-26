@@ -1,23 +1,16 @@
-# This file is part of LibreCodeCoop/ansible-docker
-#
-# Copyright (C) 2022 LibreCode coop <contact@librecode.coop>
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>
-#
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 ---
-- import_tasks: docker.yml
-  when: docker | bool
+- name: Validate standalone Talk HPB settings
+  ansible.builtin.import_tasks: validate.yml
+  when: talk_deploy_enabled | bool
 
-- import_tasks: restart-services.yml
-  when: restart | bool
+- name: Render standalone Talk HPB configuration
+  ansible.builtin.import_tasks: render.yml
+  when: talk_deploy_enabled | bool
+
+- name: Apply standalone Talk HPB deployment
+  ansible.builtin.import_tasks: deploy.yml
+  when:
+    - talk_deploy_enabled | bool
+    - talk_compose_up | bool
