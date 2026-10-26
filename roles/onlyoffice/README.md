@@ -1,42 +1,38 @@
-Onlyoffice
-=========
+# OnlyOffice role
 
-Setup do Onlyoffice.
+## Status and prerequisites
 
-Requirements
-------------
+This role checks for Docker Compose v2; it does not install Docker, deploy
+OnlyOffice, restart containers or migrate any data. The earlier implementation
+only installed Docker and notified a non-existent restart handler: it did not
+deploy the provided Compose template. We deliberately do not silently begin
+deploying an unvalidated third-party image or altering persistent volumes.
 
-Pré-requisito:
-  - Utilizar o nginx-proxy
-  - Definir uma entrada DNS para esse serviço
-  - Definir no arquivo `.env` na variável `VIRTUAL_HOST` a entrada criada
+Provision Docker Engine explicitly first:
 
+```yaml
+- name: Prepare OnlyOffice hosts
+  hosts: onlyoffice_hosts
+  become: true
+  roles:
+    - docker
+    - onlyoffice
+```
 
-Role Variables
---------------
+The host must have Docker Engine, Compose v2, and Docker daemon permissions.
+`onlyoffice_validate_prerequisites` is `true` by default.
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+## Existing deployment assets and migration
 
-Dependencies
-------------
+`files/compose.yml` and `templates/docker-compose.yml.j2` remain
+unchanged for review and compatibility with manually operated deployments.
+Their third-party, amd64-specific image, external networks, bind mounts,
+secrets, health checks, and migration to an official supported OnlyOffice Docs
+image require a separate tested deployment PR. Do not delete persistent data
+or switch images without inspecting the existing environment.
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
-
-Example Playbook
-----------------
-
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
-
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
-
-License
--------
-
-BSD
-
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+Credentials and JWT secrets MUST be provisioned out of band; rotate credentials
+that appeared in repository history. The checked-in `files/.env` needs a
+separate security cleanup (including historical references). Do not deploy
+from that file. A removed or deactivated application deployment is NOT implied
+by the validation-only role.
