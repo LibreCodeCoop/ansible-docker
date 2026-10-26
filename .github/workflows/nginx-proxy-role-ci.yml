@@ -1,0 +1,33 @@
+name: Nginx Proxy role validation
+
+on:
+  pull_request:
+    paths:
+      - 'roles/nginx-proxy/**'
+      - '.github/workflows/nginx-proxy-role-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'roles/nginx-proxy/**'
+      - '.github/workflows/nginx-proxy-role-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install Ansible QA tooling
+        run: |
+          python3 -m venv /tmp/ansible-qa
+          /tmp/ansible-qa/bin/pip install 'ansible-core>=2.17,<2.21' 'ansible-lint>=24,<27'
+      - name: Install pinned community Docker collection
+        run: /tmp/ansible-qa/bin/ansible-galaxy collection install community.docker:5.0.5 -p /tmp/ansible-collections
+      - name: Validate syntax and lint
+        run: |
+          export ANSIBLE_ROLES_PATH="$GITHUB_WORKSPACE/roles"
+          export ANSIBLE_COLLECTIONS_PATH=/tmp/ansible-collections
+          /tmp/ansible-qa/bin/ansible-playbook -i localhost, roles/nginx-proxy/tests/syntax.yml --syntax-check
+          /tmp/ansible-qa/bin/ansible-lint --offline roles/nginx-proxy

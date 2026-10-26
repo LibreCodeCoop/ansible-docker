@@ -1,38 +1,74 @@
 ---
-#Ansible role for setting up nginx-proxy
-- name: Ensure required packages are installed
+- name: Verify Docker Compose v2 is available
+  ansible.builtin.command:
+    cmd: docker compose version
+  register: nginx_proxy_compose
+  changed_when: false
+  failed_when: false
+
+- name: Require Docker Engine and Compose v2
+  ansible.builtin.assert:
+    that:
+      - nginx_proxy_compose.rc == 0
+    fail_msg: Provision Docker Engine and Compose v2 before using this role.
+
+- name: Verify Docker daemon is accessible
+  ansible.builtin.command:
+    cmd: docker info
+  register: nginx_proxy_docker_info
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Require Docker daemon access
+  ansible.builtin.assert:
+    that:
+      - nginx_proxy_docker_info.rc == 0
+    fail_msg: Docker Engine is not accessible to this Ansible user.
+
+- name: Install Git
   ansible.builtin.package:
-    name:
-      - git
-      - docker
-      - docker-compose
+    name: git
     state: present
 
-- name: Create projects directory
+- name: Ensure the proxy project directory exists
   ansible.builtin.file:
     path: "{{ nginx_proxy_project_path }}"
     state: directory
     mode: '0755'
 
-- name: Clone nginx-proxy repository
+- name: Inspect existing proxy checkout
+  ansible.builtin.stat:
+    path: "{{ nginx_proxy_project_path }}/.git"
+  register: nginx_proxy_repository
+
+- name: Clone pinned proxy repository on a fresh host
   ansible.builtin.git:
-    repo: 'https://github.com/LibreCodeCoop/nginx-proxy.git'
+    repo: "{{ nginx_proxy_repository_url }}"
     dest: "{{ nginx_proxy_project_path }}"
-    version: master
-    force: yes
-    
-- name: Create docker network
+    version: "{{ nginx_proxy_repository_ref }}"
+    update: false
+    force: false
+  when: not nginx_proxy_repository.stat.exists
+
+- name: Update proxy repository only when explicitly requested
+  ansible.builtin.git:
+    repo: "{{ nginx_proxy_repository_url }}"
+    dest: "{{ nginx_proxy_project_path }}"
+    version: "{{ nginx_proxy_repository_ref }}"
+    update: true
+    force: false
+  when:
+    - nginx_proxy_repository.stat.exists
+    - nginx_proxy_update_repository | bool
+
+- name: Ensure reverse-proxy Docker network exists
   community.docker.docker_network:
     name: "{{ nginx_proxy_network_name }}"
     state: present
 
-- name: Start nginx-proxy services
+- name: Reconcile Nginx proxy services using Compose v2
   community.docker.docker_compose_v2:
     project_src: "{{ nginx_proxy_project_path }}"
     state: present
-    pull: always
-
-- name: Ensure docker services are running
-  community.docker.docker_compose_v2:
-    project_src: "{{ nginx_proxy_project_path }}"
-    state: present
+    pull: missing
