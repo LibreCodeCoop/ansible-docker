@@ -29,16 +29,16 @@ python3 -m unittest discover -s tests/security -p 'test_*.py' -v
 python3 scripts/check_secret_literals.py
 ```
 
-Checks run for pull requests and pushes to `main`, with read-only repository
-permissions. A failure reports only file, line and field. It never prints,
-hashes or uploads a matched value.
+Checks run for pull requests and pushes to main, with read-only repository
+permissions. In CI, the guard also inspects every changed blob in each new
+commit relative to the GitHub event baseline. This catches a literal committed
+and removed in a later commit of the same PR; existing history is excluded.
+A failure reports only commit, file, line and field, never a matched value.
 
-**Limitations:** This intentionally narrow detector is not a generic secret
-scanner and does not inspect Git history, pull request refs, commits introduced
-outside normal PR workflows, forks, local clones or CI artifacts. It cannot
-determine whether a secret was deployed or used. Review custom GitHub secret
-scanning patterns and push protection where the organization's plan permits,
-and test custom patterns with synthetic data before publication.
+Limitations: this deliberately narrow detector does not remediate old Git
+history, inspect GitHub-managed PR caches, forks, clones or workflow artifacts,
+or prove whether a secret is used. Custom secret scanning and push protection
+should be used alongside it when available.
 
 ## Vault and deployment requirements
 
