@@ -49,7 +49,8 @@ def scan_file(path: str, content: str) -> list[tuple[int, str]]:
     """Return (line number, field name) only; never return credential values."""
     normalized = path.replace("\\", "/")
     talk = normalized.startswith("roles/nextcloud-talk/")
-    env = normalized.rsplit("/", 1)[-1] == ".env"
+    filename = normalized.rsplit("/", 1)[-1]
+    env = filename == ".env" or filename in ("env.j2", ".env.j2")
     matches: list[tuple[int, str]] = []
     for number, line in enumerate(content.splitlines(), start=1):
         if line.lstrip().startswith("#"):

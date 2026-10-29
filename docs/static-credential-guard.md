@@ -13,7 +13,8 @@ tracked working-tree files, without ever printing the field value. It rejects:
 - Inline values for `hashkey`, `blockkey`, `internalsecret`, and `apikey`
   in Nextcloud Talk role configuration;
 - Inline `pgadmin_password` assignments;
-- Nonempty inline DB/JWT/password assignments in tracked `.env` files for
+- Nonempty inline DB/JWT/password assignments in tracked `.env` files or
+  `env.j2` / `.env.j2` templates for
   the specific environment keys defined in the script.
 
 Simple Jinja variable references, environment variable references, and an

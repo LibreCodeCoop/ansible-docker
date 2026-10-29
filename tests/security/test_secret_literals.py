@@ -106,6 +106,15 @@ class SecretLiteralTests(unittest.TestCase):
             [],
         )
 
+    def test_env_jinja_template_rejects_static_pgadmin_password(self):
+        self.assertEqual(
+            guard.scan_file(
+                "roles/postgres/templates/env.j2",
+                "PGADMIN_DEFAULT_PASSWORD=synthetic-example\n",
+            ),
+            [(1, "PGADMIN_DEFAULT_PASSWORD")],
+        )
+
     def test_no_sensitive_values_are_returned(self):
         findings = guard.scan_file(
             self.pgadmin_path, "pgadmin_password: synthetic-sample\n"
