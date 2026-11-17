@@ -1,0 +1,20 @@
+---
+# Synthetic tenant used only to verify the portable runner.
+mail_provision_enabled: false
+mail_provision_install_dir: /usr/local/libexec/mail-provision
+mail_provision_config_dir: /etc/mail-provision
+mail_provision_cron_file: mail-provision-example
+mail_provision_runtime: docker
+mail_provision_php_bin: /usr/bin/php
+mail_provision_container: cloud-example-app
+mail_provision_container_user: www-data
+mail_provision_nextcloud_root: /var/www/html
+mail_provision_domain: example.test
+mail_provision_group: Members
+mail_provision_api_url: https://mail.example.test/api/v1/
+mail_provision_imap_host: imap.example.test
+mail_provision_imap_port: 993
+mail_provision_smtp_host: smtp.example.test
+mail_provision_smtp_port: 587
+mail_provision_quota_mib: 1024
+mail_provision_account_name: Example Organization

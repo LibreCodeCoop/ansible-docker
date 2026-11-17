@@ -1,0 +1,6 @@
+---
+- name: Validate generic Mailcow / Nextcloud Mail role
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: nextcloud-mailcow-provision

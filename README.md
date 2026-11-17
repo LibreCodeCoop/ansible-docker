@@ -1,5 +1,7 @@
 # Configurações
 
+Role independente: [Nextcloud Mail + Mailcow provisioning](roles/nextcloud-mailcow-provision/README.md) - reconciliação, aquecimento inicial e assinatura padrão por usuário.
+
 Ambiente genérico com `docker compose.yml` para deploy de serviços.
 
 O primeiro passo é criar o arquivo `inventory.ini` e preencher com dados do host de destino.

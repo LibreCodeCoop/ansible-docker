@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Minimal privileged launcher; the actual provisioning logic is PHP.
+set -euo pipefail
+umask 077
+
+readonly source={{ (mail_provision_install_dir ~ '/nextcloud-mailcow-reconcile.php') | quote }}
+readonly config_dir={{ mail_provision_config_dir | quote }}
+readonly user={{ (mail_provision_container_user | default('www-data')) | quote }}
+readonly key_file="$config_dir/mailcow-api-key"
+readonly baseline_file="$config_dir/legacy-uids.json"
+readonly lock="$config_dir/reconcile.lock"
+
+if [[ ! -r "$source" ]] || [[ ! -f "$baseline_file" ]] || \
+   [[ "$(stat -Lc '%u:%a' -- "$baseline_file")" != '0:600' ]]; then
+    logger -p user.err -t mail-provision-reconcile -- "Missing source or protected baseline"
+    exit 3
+fi
+
+export MAIL_PROVISION_LEGACY_UIDS MAIL_PROVISION_API_KEY
+MAIL_PROVISION_LEGACY_UIDS="$(cat -- "$baseline_file")"
+if [[ -z "$MAIL_PROVISION_LEGACY_UIDS" ]]; then
+    logger -p user.err -t mail-provision-reconcile -- "Invalid frozen UID baseline"
+    exit 3
+fi
+
+export MAIL_PROVISION_WRITE_ENABLED=1
+MAIL_PROVISION_API_KEY=''
+if [[ "$(printenv MAIL_PROVISION_DRY_RUN || true)" == '1' ]]; then
+    MAIL_PROVISION_WRITE_ENABLED=0
+else
+    if [[ ! -f "$key_file" ]] || \
+       [[ "$(stat -Lc '%u:%a' -- "$key_file")" != '0:600' ]]; then
+        logger -p user.err -t mail-provision-reconcile -- "Missing protected Mailcow API credential"
+        exit 3
+    fi
+    MAIL_PROVISION_API_KEY="$(cat -- "$key_file")"
+    if [[ -z "$MAIL_PROVISION_API_KEY" ]] || \
+       [[ "$MAIL_PROVISION_API_KEY" == *$'\n'* ]]; then
+        logger -p user.err -t mail-provision-reconcile -- "Invalid Mailcow API credential"
+        exit 3
+    fi
+fi
+
+export MAIL_PROVISION_ONLY_UID
+MAIL_PROVISION_ONLY_UID="$(printenv MAIL_PROVISION_ONLY_UID || true)"
+export MAIL_PROVISION_DOMAIN={{ mail_provision_domain | quote }}
+export MAIL_PROVISION_GROUP={{ mail_provision_group | quote }}
+export MAIL_PROVISION_API_URL={{ mail_provision_api_url | quote }}
+export MAIL_PROVISION_IMAP_HOST={{ mail_provision_imap_host | quote }}
+export MAIL_PROVISION_IMAP_PORT={{ mail_provision_imap_port | string | quote }}
+export MAIL_PROVISION_SMTP_HOST={{ mail_provision_smtp_host | quote }}
+export MAIL_PROVISION_SMTP_PORT={{ mail_provision_smtp_port | string | quote }}
+export MAIL_PROVISION_QUOTA_MIB={{ mail_provision_quota_mib | string | quote }}
+export MAIL_PROVISION_ACCOUNT_NAME={{ mail_provision_account_name | quote }}
+export MAIL_PROVISION_NEXTCLOUD_ROOT={{ mail_provision_nextcloud_root | quote }}
+export MAIL_PROVISION_SIGNATURE_ENABLED={{ ('1' if mail_provision_signature_enabled | default(false) else '0') | quote }}
+export MAIL_PROVISION_SIGNATURE_TEMPLATE={{ mail_provision_signature_template | default('') | quote }}
+export MAIL_PROVISION_SIGNATURE_DEFAULT_ROLE={{ mail_provision_signature_default_role | default('') | quote }}
+export MAIL_PROVISION_SIGNATURE_ORGANIZATION={{ mail_provision_signature_organization | default('') | quote }}
+export MAIL_PROVISION_SIGNATURE_WEBSITE={{ mail_provision_signature_website | default('') | quote }}
+
+{% if (mail_provision_runtime | default('docker')) == 'native' %}
+# Native Nextcloud installation with a local PHP CLI.
+set -- runuser -u "$user" -- {{ mail_provision_php_bin | quote }}
+{% else %}
+# Docker deployment: secret values go through inherited environment,
+# not docker-exec command arguments, Git, cron, or on-disk container files.
+set -- docker exec -i -u "$user" \
+    -e MAIL_PROVISION_API_KEY -e MAIL_PROVISION_LEGACY_UIDS \
+    -e MAIL_PROVISION_WRITE_ENABLED -e MAIL_PROVISION_ONLY_UID \
+    -e MAIL_PROVISION_DOMAIN -e MAIL_PROVISION_GROUP \
+    -e MAIL_PROVISION_API_URL -e MAIL_PROVISION_IMAP_HOST \
+    -e MAIL_PROVISION_IMAP_PORT -e MAIL_PROVISION_SMTP_HOST \
+    -e MAIL_PROVISION_SMTP_PORT -e MAIL_PROVISION_QUOTA_MIB \
+    -e MAIL_PROVISION_ACCOUNT_NAME -e MAIL_PROVISION_NEXTCLOUD_ROOT \
+    -e MAIL_PROVISION_SIGNATURE_ENABLED -e MAIL_PROVISION_SIGNATURE_TEMPLATE \
+    -e MAIL_PROVISION_SIGNATURE_DEFAULT_ROLE -e MAIL_PROVISION_SIGNATURE_ORGANIZATION \
+    -e MAIL_PROVISION_SIGNATURE_WEBSITE \
+    {{ mail_provision_container | quote }} php
+{% endif %}
+
+if output=$(flock -n -E 0 "$lock" "$@" < "$source" 2>&1); then
+    [[ -z "$output" ]] || logger -t mail-provision-reconcile -- "$output"
+else
+    status=$?
+    logger -p user.err -t mail-provision-reconcile -- "Exit status $status: $output"
+    exit "$status"
+fi

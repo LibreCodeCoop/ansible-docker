@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# One initial Mail warmup per run; IMAP credentials remain inside Nextcloud.
+set -euo pipefail
+umask 077
+
+readonly source={{ (mail_provision_install_dir ~ '/nextcloud-mail-warmup.php') | quote }}
+readonly config_dir={{ mail_provision_config_dir | quote }}
+readonly state_dir="$config_dir/warmup-state"
+readonly lock="$config_dir/warmup.lock"
+readonly group={{ mail_provision_group | quote }}
+readonly nc_root={{ mail_provision_nextcloud_root | quote }}
+readonly run_user={{ mail_provision_container_user | quote }}
+
+if [ "$(id -u)" -ne 0 ] || [ ! -f "$source" ] || [ ! -d "$state_dir" ]; then
+  echo "WARMUP_SETUP_UNAVAILABLE" >&2
+  exit 3
+fi
+if [ "$(stat -Lc '%u:%a' "$config_dir")" != "0:700" ] ||
+   [ "$(stat -Lc '%u:%a' "$state_dir")" != "0:700" ]; then
+  echo "WARMUP_UNSAFE_STATE_PERMISSIONS" >&2
+  exit 3
+fi
+
+exec 9>"$lock"
+flock -n 9 || exit 0
+
+mail_php() {
+  local mode="$1" target="$2"
+  export MAIL_WARMUP_MODE="$mode" MAIL_WARMUP_ACCOUNT_ID="$target"
+  export MAIL_WARMUP_GROUP="$group" MAIL_PROVISION_NEXTCLOUD_ROOT="$nc_root"
+{% if (mail_provision_runtime | default('docker')) == 'native' %}
+  runuser -u "$run_user" -- {{ mail_provision_php_bin | quote }} < "$source"
+{% else %}
+  docker exec -i -u "$run_user" \
+    -e MAIL_WARMUP_MODE -e MAIL_WARMUP_ACCOUNT_ID \
+    -e MAIL_WARMUP_GROUP -e MAIL_PROVISION_NEXTCLOUD_ROOT \
+    {{ mail_provision_container | quote }} php < "$source"
+{% endif %}
+}
+
+sync_account() {
+  local account_id="$1"
+{% if (mail_provision_runtime | default('docker')) == 'native' %}
+  ( cd "$nc_root" && runuser -u "$run_user" -- timeout --signal=TERM --kill-after=15s 600s \
+      {{ mail_provision_php_bin | quote }} -d memory_limit=1024M occ \
+      mail:account:sync --no-interaction "$account_id" )
+{% else %}
+  docker exec -u "$run_user" -w "$nc_root" {{ mail_provision_container | quote }} \
+    timeout --signal=TERM --kill-after=15s 600s php -d memory_limit=1024M occ \
+    mail:account:sync --no-interaction "$account_id"
+{% endif %}
+}
+
+preprocess_account() {
+  local job_id="$1"
+{% if (mail_provision_runtime | default('docker')) == 'native' %}
+  ( cd "$nc_root" && runuser -u "$run_user" -- timeout --signal=TERM --kill-after=15s 600s \
+      {{ mail_provision_php_bin | quote }} -d memory_limit=1024M occ \
+      background-job:execute --force-execute --no-interaction "$job_id" )
+{% else %}
+  docker exec -u "$run_user" -w "$nc_root" {{ mail_provision_container | quote }} \
+    timeout --signal=TERM --kill-after=15s 600s php -d memory_limit=1024M occ \
+    background-job:execute --force-execute --no-interaction "$job_id"
+{% endif %}
+}
+
+# Only sanitized numeric fields and an account fingerprint from the PHP inspector.
+parse_line() {
+  local input="$1"
+  IFS='|' read -r aid fp locked sync_busy preview_busy sync_job preview_job \
+    counts_ok tokens_ok pending folders_ok ready trailing <<< "$input"
+  if [[ ! "$aid" =~ ^[1-9][0-9]*$ ]] ||
+     [[ ! "$fp" =~ ^[a-f0-9]{64}$ ]] ||
+     [[ ! "$locked" =~ ^[01]$ ]] ||
+     [[ ! "$sync_busy" =~ ^[01]$ ]] ||
+     [[ ! "$preview_busy" =~ ^[01]$ ]] ||
+     [[ ! "$sync_job" =~ ^[0-9]+$ ]] ||
+     [[ ! "$preview_job" =~ ^[0-9]+$ ]] ||
+     [[ ! "$counts_ok" =~ ^[01]$ ]] ||
+     [[ ! "$tokens_ok" =~ ^[01]$ ]] ||
+     [[ ! "$pending" =~ ^[0-9]+$ ]] ||
+     [[ ! "$folders_ok" =~ ^[01]$ ]] ||
+     [[ ! "$ready" =~ ^[01]$ ]] ||
+     [ -n "$trailing" ]; then
+    echo "WARMUP_INVALID_INSPECTOR_OUTPUT" >&2
+    exit 3
+  fi
+}
+
+notify() {
+  logger -t mail-initial-warmup -- "$1" || true
+  echo "$1"
+}
+
+retry_account() {
+  local category="$1" attempts=0 next=0
+  if [ -f "$retry_file" ]; then
+    read -r attempts next < "$retry_file"
+    [[ "$attempts" =~ ^[0-9]+$ ]] || { echo 'WARMUP_CORRUPT_RETRY_STATE' >&2; exit 3; }
+  fi
+  attempts=$((attempts + 1))
+  local delay=$((300 * (2 ** (attempts > 6 ? 6 : attempts - 1))))
+  if [ "$delay" -gt 21600 ]; then delay=21600; fi
+  local tmp
+  tmp=$(mktemp "$state_dir/.retry.XXXXXXXX")
+  printf '%s %s\n' "$attempts" "$(( $(date +%s) + delay ))" > "$tmp"
+  mv -f -- "$tmp" "$retry_file"
+  notify "status=retry category=$category retry_delay_seconds=$delay"
+  exit 2
+}
+
+mode="run"
+if [ "$#" -gt 0 ]; then
+  case "$1" in
+    --status) mode="status" ;;
+    --run) ;;
+    *) echo 'Usage: mail-warmup-run [--status|--run]' >&2; exit 3 ;;
+  esac
+fi
+
+inventory=$(mail_php scan 0) || { notify 'status=scan_error'; exit 3; }
+eligible=0 complete=0 pending_count=0 deferred=0 drift=0
+selected=""
+now=$(date +%s)
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  parse_line "$line"
+  eligible=$((eligible + 1))
+  marker="$state_dir/done-$aid-$fp"
+  retry="$state_dir/retry-$aid-$fp"
+  if [ -f "$marker" ]; then
+    [ "$(stat -Lc '%u:%a' "$marker")" = "0:600" ] || exit 3
+    complete=$((complete + 1))
+    if [ "$ready" != 1 ]; then drift=$((drift + 1)); fi
+    continue
+  fi
+  pending_count=$((pending_count + 1))
+  if [ -f "$retry" ]; then
+    [ "$(stat -Lc '%u:%a' "$retry")" = "0:600" ] || exit 3
+    read -r attempts next < "$retry"
+    [[ "$attempts" =~ ^[0-9]+$ && "$next" =~ ^[0-9]+$ ]] || exit 3
+    if [ "$next" -gt "$now" ]; then deferred=$((deferred + 1));continue; fi
+  fi
+  if [ "$locked" = 1 ] || [ "$sync_busy" = 1 ] || [ "$preview_busy" = 1 ]; then
+    deferred=$((deferred + 1))
+    continue
+  fi
+  if [ -z "$selected" ]; then selected="$aid"; selected_fp="$fp"; fi
+done <<< "$inventory"
+
+if [ "$mode" = "status" ]; then
+  echo "eligible=$eligible complete=$complete pending=$pending_count deferred=$deferred cache_drift=$drift"
+  exit 0
+fi
+if [ -z "$selected" ]; then
+  # Normal when all accounts are complete; do not spam the journal.
+  exit 0
+fi
+
+account_id="$selected"
+fingerprint="$selected_fp"
+marker="$state_dir/done-$account_id-$fingerprint"
+retry_file="$state_dir/retry-$account_id-$fingerprint"
+log=$(mktemp "$state_dir/.job-log.XXXXXXXX")
+trap 'rm -f -- "$log"' EXIT
+
+if ! mail_php ensure-jobs "$account_id" > "$log" 2>&1; then
+  retry_account ensure_native_jobs
+fi
+
+before=$(mail_php inspect "$account_id") || retry_account inspect_before
+parse_line "$before"
+[ "$aid" = "$account_id" ] && [ "$fp" = "$fingerprint" ] || retry_account identity_changed
+if [ "$locked" = 1 ] || [ "$sync_busy" = 1 ] || [ "$preview_busy" = 1 ]; then
+  # A native job started meanwhile: let it finish.
+  exit 0
+fi
+
+if ! sync_account "$account_id" > "$log" 2>&1; then
+  retry_account native_sync
+fi
+
+after_sync=$(mail_php inspect "$account_id") || retry_account inspect_after_sync
+parse_line "$after_sync"
+[ "$aid" = "$account_id" ] && [ "$fp" = "$fingerprint" ] || retry_account identity_changed
+if [ "$locked" = 1 ] || [ "$sync_busy" = 1 ] || [ "$preview_busy" = 1 ]; then
+  exit 0
+fi
+if [ "$preview_job" -eq 0 ]; then
+  retry_account missing_preview_job
+fi
+
+if [ "$pending" -gt 0 ]; then
+  if ! preprocess_account "$preview_job" > "$log" 2>&1; then
+    retry_account recent_previews
+  fi
+fi
+
+after_previews=$(mail_php inspect "$account_id") || retry_account inspect_after_previews
+parse_line "$after_previews"
+[ "$aid" = "$account_id" ] && [ "$fp" = "$fingerprint" ] || retry_account identity_changed
+if [ "$ready" != 1 ]; then
+  retry_account incomplete_index
+fi
+if ! mail_php privacy "$account_id" > "$log" 2>&1; then
+  retry_account privacy
+fi
+
+# Atomic, private completion marker only after all postconditions.
+tmp=$(mktemp "$state_dir/.done.XXXXXXXX")
+printf 'completed_epoch=%s\n' "$(date +%s)" > "$tmp"
+mv -f -- "$tmp" "$marker"
+rm -f -- "$retry_file"
+notify "status=complete"

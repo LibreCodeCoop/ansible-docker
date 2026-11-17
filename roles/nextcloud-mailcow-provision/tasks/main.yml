@@ -1,0 +1,130 @@
+---
+- name: Require explicitly configured Mailcow and Nextcloud instance
+  ansible.builtin.assert:
+    that:
+      - mail_provision_install_dir is defined
+      - mail_provision_config_dir is defined
+      - mail_provision_cron_file is defined
+      - mail_provision_runtime is defined
+      - mail_provision_runtime in ['docker', 'native']
+      - mail_provision_container_user is defined
+      - mail_provision_runtime == 'native' or mail_provision_container is defined
+      - mail_provision_runtime == 'native' or mail_provision_container | length > 0
+      - mail_provision_runtime == 'docker' or mail_provision_php_bin is defined
+      - mail_provision_domain is defined
+      - mail_provision_domain | length > 0
+      - mail_provision_group is defined
+      - mail_provision_group | length > 0
+      - mail_provision_api_url is defined
+      - mail_provision_api_url is match('^https://[^/]+/api/v1/$')
+      - mail_provision_imap_host is defined
+      - mail_provision_smtp_host is defined
+      - mail_provision_imap_port is defined
+      - mail_provision_smtp_port is defined
+      - mail_provision_account_name is defined
+      - mail_provision_quota_mib is defined
+      - mail_provision_nextcloud_root is defined
+    fail_msg: Set mail_provision_* values in host_vars for the instance.
+
+- name: Create local program directory
+  ansible.builtin.file:
+    path: "{{ mail_provision_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create protected local configuration directory
+  ansible.builtin.file:
+    path: "{{ mail_provision_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install PHP components
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ mail_provision_install_dir }}/{{ item | basename }}"
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - nextcloud-mailcow-reconcile.php
+    - nextcloud-mailcow-baseline.php
+    - nextcloud-mailcow-fields.php
+
+- name: Install instance-specific runner
+  ansible.builtin.template:
+    src: mail-provision-run.sh.j2
+    dest: "{{ mail_provision_install_dir }}/mail-provision-run"
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Install native Mail initial warmup inspector
+  ansible.builtin.copy:
+    src: nextcloud-mail-warmup.php
+    dest: "{{ mail_provision_install_dir }}/nextcloud-mail-warmup.php"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install initial warmup runner
+  ansible.builtin.template:
+    src: mail-warmup-run.sh.j2
+    dest: "{{ mail_provision_install_dir }}/mail-warmup-run"
+    owner: root
+    group: root
+    mode: '0750'
+
+- name: Create protected warmup progress directory
+  ansible.builtin.file:
+    path: "{{ mail_provision_config_dir }}/warmup-state"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule serial warmup only when explicitly enabled
+  ansible.builtin.cron:
+    name: Initial Nextcloud Mail account warmup
+    cron_file: "{{ mail_provision_cron_file }}-warmup"
+    user: root
+    minute: '2-59/5'
+    job: "{{ mail_provision_install_dir }}/mail-warmup-run"
+    state: "{{ 'present' if mail_warmup_enabled | default(false) | bool else 'absent' }}"
+
+- name: Inspect protected API credential before enabling
+  ansible.builtin.stat:
+    path: "{{ mail_provision_config_dir }}/mailcow-api-key"
+  register: mail_provision_key
+  when: mail_provision_enabled | default(false) | bool
+
+- name: Inspect frozen legacy UID baseline before enabling
+  ansible.builtin.stat:
+    path: "{{ mail_provision_config_dir }}/legacy-uids.json"
+  register: mail_provision_baseline
+  when: mail_provision_enabled | default(false) | bool
+
+- name: Require root-owned private credential and baseline
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - item.stat.uid == 0
+      - item.stat.mode == '0600'
+    fail_msg: Configure root-only API key and frozen UID baseline before enabling cron.
+  loop:
+    - "{{ mail_provision_key }}"
+    - "{{ mail_provision_baseline }}"
+  when: mail_provision_enabled | default(false) | bool
+
+- name: Schedule reconciliation only when enabled
+  ansible.builtin.cron:
+    name: Nextcloud Mailcow account reconciliation
+    cron_file: "{{ mail_provision_cron_file }}"
+    user: root
+    minute: '*/5'
+    job: "{{ mail_provision_install_dir }}/mail-provision-run"
+    state: "{{ 'present' if mail_provision_enabled | default(false) | bool else 'absent' }}"
