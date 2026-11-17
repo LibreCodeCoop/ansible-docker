@@ -1,0 +1,14 @@
+---
+# Generic fail-closed defaults, overridden by the consumer's private host_vars.
+mail_provision_enabled: false
+mail_warmup_enabled: false
+mail_provision_signature_enabled: false
+mail_provision_signature_default_role: Member
+mail_provision_signature_role_label: Role or title
+mail_provision_signature_template: |
+  {name}
+  {role} | {organization}
+  {email}
+  {website}
+mail_provision_signature_organization: ''
+mail_provision_signature_website: ''
