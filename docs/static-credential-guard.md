@@ -7,7 +7,7 @@ content into a public repository, CI artifact, PR, or issue.
 
 ## Guard implemented in this repository
 
-The [static credential guard](../scripts/check_secret_literals.py) checks
+The [static credential guard](../scripts/check_secret_literals.php) checks
 tracked working-tree files, without ever printing the field value. It rejects:
 
 - Inline values for `hashkey`, `blockkey`, `internalsecret`, and `apikey`
@@ -25,8 +25,8 @@ runtime validation that a required secret is actually provided.
 Run locally:
 
 ```sh
-python3 -m unittest discover -s tests/security -p 'test_*.py' -v
-python3 scripts/check_secret_literals.py
+composer test
+php scripts/check_secret_literals.php
 ```
 
 Checks run for pull requests and pushes to main, with read-only repository

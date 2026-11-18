@@ -75,3 +75,16 @@ man-in-the-middle attacks. Provision trusted host keys in the operator's
 known_hosts before connecting. Do not disable verification globally as
 a workaround. The shared ansible.cfg is versioned; use inventory and
 external Vault-protected settings for environment-specific configuration.
+
+## PHP development and role testing
+
+Reusable PHP components and role-level tools use Composer, PHPUnit, Psalm,
+PHPStan and PHPCS. From the repository root, run `composer install` and
+`composer qa`. Test the Talk Ansible render locally with
+`composer test:talk`; set `RUN_HPB_INTEGRATION=1` only in a disposable
+Docker environment to exercise Janus, signaling, Coturn and actual media
+transfer. The Mailcow role retains its separate offline test entrypoint
+`bash roles/nextcloud-mailcow-provision/tests/check.sh`.
+
+Ansible itself remains Python-based. No production host requires Composer or
+the PHP developer dependencies, and tests never authorize a deployment.

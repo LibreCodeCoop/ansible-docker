@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<ruleset name="LibreCode Ansible Docker">
+  <description>Maintainable PHP helpers for Ansible role tooling</description>
+  <file>src</file>
+  <file>tests/Unit</file>
+  <file>tests/Integration</file>
+  <file>tests/Talk</file>
+  <file>scripts/check_secret_literals.php</file>
+  <file>tests/nextcloud-talk/media_smoke.php</file>
+  <rule ref="PSR12"/>
+  <rule ref="Generic.Files.LineLength">
+    <properties>
+      <property name="lineLimit" value="180"/>
+      <property name="absoluteLineLimit" value="0"/>
+    </properties>
+  </rule>
+</ruleset>

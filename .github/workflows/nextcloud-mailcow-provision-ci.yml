@@ -1,5 +1,4 @@
 name: Nextcloud Mailcow reusable role
-
 on:
   pull_request:
     paths:
@@ -10,19 +9,17 @@ on:
       - 'roles/nextcloud-mailcow-provision/**'
       - '.github/workflows/nextcloud-mailcow-provision-ci.yml'
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install role test dependencies
+      - name: Install Ansible Core
         run: |
-          python3 -m pip install --user 'Jinja2>=3.1,<4' 'PyYAML>=6,<7' 'ansible-core>=2.18,<2.22'
+          python3 -m pip install --user 'ansible-core>=2.18,<2.22'
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Offline PHP tests, Jinja rendering, and Ansible syntax
+      - name: Offline PHP tests, Ansible template rendering, and syntax
         run: bash roles/nextcloud-mailcow-provision/tests/check.sh

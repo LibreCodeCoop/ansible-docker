@@ -3,3 +3,8 @@ inventory.ini
 ssh*
 .venv/
 __pycache__/
+/vendor/
+/.phpunit.cache/
+/.phpstan-cache/
+/.psalm/
+/infection.log

@@ -6,7 +6,7 @@ set -euo pipefail
 role="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 tmp="$(mktemp -d -t nc-mailcow-role.XXXXXXXX)"
 trap 'rm -rf -- "$tmp"' EXIT
-for tool in docker python3 bash; do command -v "$tool" >/dev/null || exit 2; done
+for tool in docker ansible-playbook bash; do command -v "$tool" >/dev/null || exit 2; done
 
 for version in 8.4 8.5; do
   echo "PHP $version: offline provisioning, signature and warmup"
@@ -20,36 +20,12 @@ for version in 8.4 8.5; do
     php tests/test_mail_warmup_policy.php
   '
 done
-python3 "$role/tests/test_mail_generic_configuration.py"
-
-python3 - "$role" "$tmp" <<'PY'
-import sys,shlex,yaml
-from pathlib import Path
-from jinja2 import Environment,StrictUndefined
-role,dest=map(Path,sys.argv[1:])
-fixture=yaml.safe_load((role/'tests/fixtures/mail-provision-instance.yml').read_text())
-env=Environment(undefined=StrictUndefined)
-env.filters['quote']=shlex.quote
-for runtime in ('docker','native'):
- data=dict(fixture)
- data['mail_provision_runtime']=runtime
- data['mail_provision_signature_enabled']=True
- data['mail_provision_signature_template']='{name}\n{role} | {organization}\n{email}'
- data['mail_provision_signature_default_role']='Member'
- data['mail_provision_signature_organization']='Example Cooperative'
- data['mail_provision_signature_website']='https://example.test'
- for source,out in [('mail-provision-run.sh.j2','reconciler'),('mail-warmup-run.sh.j2','warmup')]:
-  rendered=env.from_string((role/'templates'/source).read_text()).render(**data)
-  if '{{' in rendered:
-   raise SystemExit('Unrendered Jinja expression')
-  (dest/f'{runtime}-{out}.sh').write_text(rendered)
-  if runtime=='docker' and out=='warmup':
-   (dest/'primary-warmup.sh').write_text(rendered)
-  if out=='reconciler':
-   assert 'MAIL_PROVISION_SIGNATURE_ENABLED=1' in rendered
-   assert 'Example Cooperative' in rendered
-print('TEMPLATE_RENDER_PASS: two execution backends, signature enabled')
-PY
+# Use Ansible's own Jinja2 renderer; the orchestration and assertions are PHP.
+ansible-playbook -i localhost, -c local \
+  "$role/tests/render-templates.yml" \
+  --extra-vars "{\"mail_test_output_dir\": \"$tmp\"}"
+docker run --rm --network none -v "$tmp:/fixtures" -v "$role:/repo:ro" \
+  php:8.4-cli php /repo/tests/verify_rendered_templates.php /fixtures
 for file in "$tmp"/*.sh; do bash -n "$file"; done
 docker run --rm --network none -v "$tmp:/fixtures:ro" -v "$role:/repo:ro" \
   php:8.4-cli bash /repo/tests/test_mail_warmup_runner.sh
