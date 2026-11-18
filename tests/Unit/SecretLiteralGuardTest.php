@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace LibreCode\AnsibleDocker\Tests\Unit;
 
+use LibreCode\AnsibleDocker\Security\GitRepository;
 use LibreCode\AnsibleDocker\Security\SecretLiteralGuard;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -51,6 +52,6 @@ final class SecretLiteralGuardTest extends TestCase
     public function testInvalidBaselineFailsClosed(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new SecretLiteralGuard())->scanAddedCommitBlobs('.', 'invalid');
+        (new GitRepository('.'))->commitsSince('invalid');
     }
 }

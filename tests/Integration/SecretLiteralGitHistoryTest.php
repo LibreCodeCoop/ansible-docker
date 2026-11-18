@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace LibreCode\AnsibleDocker\Tests\Integration;
 
+use LibreCode\AnsibleDocker\Security\GitRepository;
+use LibreCode\AnsibleDocker\Security\RepositoryCredentialScanner;
 use LibreCode\AnsibleDocker\Security\SecretLiteralGuard;
 use PHPUnit\Framework\TestCase;
 
@@ -34,7 +36,7 @@ final class SecretLiteralGitHistoryTest extends TestCase
             file_put_contents($target, "hashkey = {{ talk_hashkey }}\n");
             $this->git($temp, 'add .');
             $this->git($temp, 'commit -qm restored');
-            $findings = (new SecretLiteralGuard())->scanAddedCommitBlobs($temp, $sha);
+            $findings = (new RepositoryCredentialScanner(new SecretLiteralGuard(), new GitRepository($temp)))->scan($sha);
             self::assertCount(1, $findings);
             self::assertSame('hashkey', $findings[0]['field']);
             self::assertSame('roles/nextcloud-talk/templates/server.conf.j2', $findings[0]['path']);

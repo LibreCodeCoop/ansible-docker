@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace LibreCode\AnsibleDocker\Tests\Talk;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class TalkRoleTest extends TestCase
@@ -36,15 +37,13 @@ final class TalkRoleTest extends TestCase
         $config = TalkTestSupport::config(self::$project);
         self::assertEqualsCanonicalizing(['janus', 'nats', 'spreedbackend'], array_keys($config['services']));
         $janus = $config['services']['janus'];
-        self::assertSame(TalkTestSupport::JANUS_IMAGE, $janus['image']);
-        self::assertSame(
-            'ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d@sha256:a1924bbdae832f596568f11965a3a28695867d2557c1793d0919077d0c803c54',
-            $config['services']['spreedbackend']['image']
-        );
-        self::assertSame(
-            'nats:2-alpine@sha256:7ae34c25dfd6fe2e01c6483eabef20d796690fdcac6c4d94ca780a6cf9877fde',
-            $config['services']['nats']['image']
-        );
+        foreach (['janus', 'nats', 'spreedbackend'] as $service) {
+            self::assertMatchesRegularExpression(
+                '/^\\S+@sha256:[a-f0-9]{64}$/',
+                $config['services'][$service]['image'],
+                'Ansible defaults must resolve to immutable image digests for ' . $service
+            );
+        }
         self::assertSame(['--full-trickle'], $janus['command']);
         self::assertTrue($janus['read_only']);
         self::assertArrayNotHasKey('network_mode', $janus);
@@ -141,56 +140,85 @@ final class TalkRoleTest extends TestCase
         self::assertDirectoryDoesNotExist($project);
     }
 
-    public function testHostileIniSectionInjectionIsRejectedWithoutSecretLeaks(): void
+    /** @return iterable<string,array{array<string,mixed>}> */
+    public static function injectionCases(): iterable
     {
         $payload = "\n[backend]\nallowall = true";
-        $cases = [
-            ['talk_nats_url' => 'nats://nats:4222' . $payload],
-            ['talk_max_stream_bitrate' => '1048576' . $payload],
-            ['talk_max_screen_bitrate' => '2097152' . $payload],
-            ['talk_turn_api_key' => str_repeat('A', 32) . $payload,
-                'talk_turn_servers' => ['turn:example.com:3478?transport=udp'],
-                'talk_turn_shared_secret' => bin2hex(random_bytes(32))],
-            ['talk_turn_shared_secret' => str_repeat('B', 40) . $payload,
-                'talk_turn_servers' => ['turn:example.com:3478?transport=udp'],
-                'talk_turn_api_key' => bin2hex(random_bytes(16))],
-            ['talk_turn_servers' => ['turn:example.com:3478?transport=udp' . $payload],
-                'talk_turn_api_key' => bin2hex(random_bytes(16)),
-                'talk_turn_shared_secret' => bin2hex(random_bytes(32))],
-        ];
-        foreach ($cases as $index => $overrides) {
-            TalkTestSupport::render(
-                self::$parent,
-                TalkTestSupport::variables(self::$parent . '/injection-' . $index, $overrides),
-                success: false
-            );
-        }
-        self::assertCount(6, $cases);
+        yield 'NATS URL' => [['talk_nats_url' => 'nats://nats:4222' . $payload]];
+        yield 'media bitrate' => [['talk_max_stream_bitrate' => '1048576' . $payload]];
+        yield 'screen bitrate' => [['talk_max_screen_bitrate' => '2097152' . $payload]];
+        yield 'TURN API key' => [[
+            'talk_turn_api_key' => str_repeat('A', 32) . $payload,
+            'talk_turn_servers' => ['turn:example.com:3478?transport=udp'],
+            'talk_turn_shared_secret' => bin2hex(random_bytes(32)),
+        ]];
+        yield 'TURN shared secret' => [[
+            'talk_turn_shared_secret' => str_repeat('B', 40) . $payload,
+            'talk_turn_servers' => ['turn:example.com:3478?transport=udp'],
+            'talk_turn_api_key' => bin2hex(random_bytes(16)),
+        ]];
+        yield 'TURN endpoint' => [[
+            'talk_turn_servers' => ['turn:example.com:3478?transport=udp' . $payload],
+            'talk_turn_api_key' => bin2hex(random_bytes(16)),
+            'talk_turn_shared_secret' => bin2hex(random_bytes(32)),
+        ]];
     }
 
-    public function testInvalidNetworkAndSecuritySettingsAreRejected(): void
+    #[DataProvider('injectionCases')]
+    public function testHostileIniSectionInjectionIsRejectedWithoutSecretLeaks(array $overrides): void
     {
-        $cases = [
-            ['talk_project_dir' => '/tmp/../etc/talk'],
-            ['talk_signaling_port' => 70000],
-            ['talk_nats_url' => 'nats://nats:99999'],
-            self::turn(['talk_turn_realm' => "example.invalid\nno-auth"]),
-            ['spreed_image' => 'ghcr.io/strukturag/nextcloud-spreed-signaling:24e899d'],
-            ['nats_image' => 'nats:2-alpine'],
-            ['talk_public_ipv4' => '999.999.999.999'],
-            ['talk_backend_secret' => ''],
-            ['janus_image' => 'ghcr.io/librecodecoop/janus:latest'],
-            ['janus_rtp_port_end' => 66000],
-            ['talk_manage_coturn' => true],
-        ];
-        foreach ($cases as $index => $overrides) {
-            TalkTestSupport::render(
-                self::$parent,
-                TalkTestSupport::variables(self::$parent . '/invalid-' . $index, $overrides),
-                success: false
-            );
-        }
-        self::assertCount(11, $cases);
+        $project = self::$parent . '/injection-' . bin2hex(random_bytes(5));
+        $result = TalkTestSupport::render(
+            self::$parent,
+            TalkTestSupport::variables($project, $overrides),
+            success: false
+        );
+        self::assertFalse($result->isSuccessful());
+    }
+
+    /** @return iterable<string,array{array<string,mixed>}> */
+    public static function invalidCases(): iterable
+    {
+        yield 'unsafe path' => [['talk_project_dir' => '/tmp/../etc/talk']];
+        yield 'out-of-range signaling port' => [['talk_signaling_port' => 70000]];
+        yield 'out-of-range NATS port' => [['talk_nats_url' => 'nats://nats:99999']];
+        yield 'invalid TURN realm' => [self::turn(['talk_turn_realm' => "example.invalid\nno-auth"])];
+        yield 'mutable signaling image' => [['spreed_image' => 'ghcr.io/strukturag/nextcloud-spreed-signaling:latest']];
+        yield 'mutable NATS image' => [['nats_image' => 'nats:2-alpine']];
+        yield 'invalid public IP address' => [['talk_public_ipv4' => '999.999.999.999']];
+        yield 'missing backend secret' => [['talk_backend_secret' => '']];
+        yield 'mutable Janus image' => [['janus_image' => 'ghcr.io/librecodecoop/janus:latest']];
+        yield 'out-of-range RTP port' => [['janus_rtp_port_end' => 66000]];
+        yield 'Coturn missing prerequisites' => [['talk_manage_coturn' => true]];
+    }
+
+    #[DataProvider('invalidCases')]
+    public function testInvalidNetworkAndSecuritySettingsAreRejected(array $overrides): void
+    {
+        $project = self::$parent . '/invalid-' . bin2hex(random_bytes(5));
+        $result = TalkTestSupport::render(
+            self::$parent,
+            TalkTestSupport::variables($project, $overrides),
+            success: false
+        );
+        self::assertFalse($result->isSuccessful());
+    }
+
+    /** @return iterable<string,array{string,string}> */
+    public static function imageOverrides(): iterable
+    {
+        yield 'signaling' => ['spreed_image', 'spreedbackend'];
+        yield 'NATS' => ['nats_image', 'nats'];
+    }
+
+    #[DataProvider('imageOverrides')]
+    public function testPinnedImageOverridesReachCompose(string $variable, string $service): void
+    {
+        $project = self::$parent . '/image-' . bin2hex(random_bytes(5));
+        $image = 'example.invalid/test:1@sha256:' . str_repeat('a', 64);
+        $args = TalkTestSupport::variables($project, [$variable => $image]);
+        TalkTestSupport::render(self::$parent, $args);
+        self::assertSame($image, TalkTestSupport::config($project)['services'][$service]['image']);
     }
 
     public function testJanusEntrypointIsNotRepeated(): void
@@ -207,17 +235,8 @@ final class TalkRoleTest extends TestCase
         mkdir($bin, 0700);
         $log = self::$parent . '/compose-commands.log';
         $docker = trim(TalkTestSupport::command(['which', 'docker'])->getOutput());
-        $wrapper = <<<'SH'
-#!/bin/sh
-for arg in "$@"; do
-  if [ "$arg" = up ]; then
-    printf '%s\n' "$*" >> "$TALK_COMPOSE_AUDIT_LOG"
-    printf 'Container test Recreated\n' >&2
-    exit 0
-  fi
-done
-exec __DOCKER__ "$@"
-SH;
+        $wrapper = file_get_contents(__DIR__ . '/fixtures/docker-compose-audit.sh');
+        self::assertIsString($wrapper);
         file_put_contents($bin . '/docker', str_replace('__DOCKER__', escapeshellarg($docker), $wrapper));
         chmod($bin . '/docker', 0755);
         $env = [
@@ -244,7 +263,7 @@ SH;
         return array_replace([
             'talk_public_ipv4' => '192.0.2.10',
             'talk_manage_coturn' => true,
-            'talk_coturn_image' => TalkTestSupport::COTURN_IMAGE,
+            'talk_coturn_image' => TalkTestSupport::coturnImage(),
             'talk_turn_realm' => 'turn.example.invalid',
             'talk_turn_servers' => ['turn:turn.example.invalid:3478?transport=udp'],
             'talk_turn_shared_secret' => bin2hex(random_bytes(32)),

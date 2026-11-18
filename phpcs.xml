@@ -1,7 +1,10 @@
 <?xml version="1.0"?>
+<!-- SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 <ruleset name="LibreCode Ansible Docker">
   <description>Maintainable PHP helpers for Ansible role tooling</description>
   <file>src</file>
+  <file>roles/nextcloud-mailcow-provision/tests/RenderedTemplateVerifier.php</file>
   <file>tests/Unit</file>
   <file>tests/Integration</file>
   <file>tests/Talk</file>

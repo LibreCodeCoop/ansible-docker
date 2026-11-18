@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
 ---
 # SPDX-License-Identifier: AGPL-3.0-or-later
 nginx_proxy_project_path: /root/projects/nginx-proxy

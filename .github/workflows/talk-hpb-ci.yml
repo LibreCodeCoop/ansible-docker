@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 name: Nextcloud Talk HPB role
+
 on:
   push:
     branches: [main]
@@ -8,6 +9,7 @@ on:
       - roles/nextcloud-talk/**
       - tests/nextcloud-talk/**
       - tests/Talk/**
+      - vendor-bin/phpunit/**
       - composer.json
       - composer.lock
       - phpunit.xml.dist
@@ -17,30 +19,39 @@ on:
       - roles/nextcloud-talk/**
       - tests/nextcloud-talk/**
       - tests/Talk/**
+      - vendor-bin/phpunit/**
       - composer.json
       - composer.lock
       - phpunit.xml.dist
       - .github/workflows/talk-hpb-ci.yml
+
 permissions:
   contents: read
+
 jobs:
   validate-and-integrate:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Ansible Core
         run: |
           python3 -m venv .venv
           .venv/bin/pip install 'ansible-core>=2.18,<2.22'
-      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
         with:
           php-version: '8.4'
           tools: composer:v2
           coverage: none
-      - name: Install locked PHP test dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Ansible syntax and real isolated Janus/WebRTC integration
+      - name: Install Composer and isolated PHPUnit/WebRTC dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          composer bin phpunit install --no-interaction --prefer-dist --no-progress
+      - name: Ansible syntax and isolated Janus/WebRTC/Coturn integration
         env:
           RUN_HPB_INTEGRATION: '1'
         run: |

@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Adapted from LibreCodeCoop/.github workflow templates for a non-Nextcloud application.
+name: PHP cyclomatic complexity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: phpmd-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  phpmd:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up PHP
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+      - name: Install Composer bin plugin
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Install isolated phpmd dependencies
+        run: composer bin phpmd install --no-interaction --prefer-dist --no-progress
+      - name: Run phpmd
+        run: composer phpmd

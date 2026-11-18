@@ -8,51 +8,32 @@
 
 declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/src/Security/SecretLiteralGuard.php';
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+use LibreCode\AnsibleDocker\Security\CredentialGuardReport;
+use LibreCode\AnsibleDocker\Security\GitRepository;
+use LibreCode\AnsibleDocker\Security\RepositoryCredentialScanner;
 use LibreCode\AnsibleDocker\Security\SecretLiteralGuard;
 
-$root = dirname(__DIR__);
-$guard = new SecretLiteralGuard();
+$scanner = new RepositoryCredentialScanner(
+    new SecretLiteralGuard(),
+    new GitRepository(dirname(__DIR__)),
+);
+
 try {
-    $pipes = [];
-    $process = proc_open('git -C ' . escapeshellarg($root) . ' ls-files -z', [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
-    if (!is_resource($process)) {
-        throw new RuntimeException('Cannot invoke git');
-    }
-    fclose($pipes[0]);
-    $raw = stream_get_contents($pipes[1]);
-    fclose($pipes[1]);
-    if (proc_close($process) !== 0 || $raw === false) {
-        throw new RuntimeException('Cannot inspect tracked files');
-    }
-    $count = 0;
-    foreach (array_filter(explode("\0", $raw)) as $name) {
-        $path = $root . '/' . $name;
-        if (!$guard->isScannable($name) || !is_file($path) || is_link($path)) {
-            continue;
-        }
-        $contents = file_get_contents($path);
-        if ($contents === false) {
-            throw new RuntimeException('Unable to read tracked file');
-        }
-        foreach ($guard->scanFile($name, $contents) as $found) {
-            fwrite(STDERR, "$name:{$found['line']}: static credential forbidden in {$found['field']}; use Vault or an external variable\n");
-            ++$count;
-        }
-    }
-    $base = getenv('SECRET_GUARD_BASE_SHA');
-    if (is_string($base) && $base !== '') {
-        foreach ($guard->scanAddedCommitBlobs($root, $base) as $found) {
-            fwrite(STDERR, "{$found['commit']} {$found['path']}:{$found['line']}: static credential forbidden in {$found['field']}; use Vault or an external variable\n");
-            ++$count;
-        }
-    }
-    if ($count > 0) {
-        fwrite(STDERR, "Secret-literal guard failed: $count finding(s).\n");
-        exit(1);
-    }
-    echo "Secret-literal guard passed.\n";
-} catch (Throwable $e) {
-    fwrite(STDERR, "Cannot inspect repository or new commit history; failing closed.\n");
+    $findings = $scanner->scan(getenv('SECRET_GUARD_BASE_SHA') ?: null);
+} catch (Throwable) {
+    // Fail closed while suppressing Git output, file contents and exception details.
+    fwrite(STDERR, "Credential inspection could not finish; failing closed.\n");
     exit(2);
 }
+
+$report = new CredentialGuardReport();
+foreach ($findings as $finding) {
+    fwrite(STDERR, $report->formatFinding($finding) . "\n");
+}
+if ($findings !== []) {
+    fwrite(STDERR, "Secret-literal guard failed: " . count($findings) . " finding(s).\n");
+    exit(1);
+}
+echo "Secret-literal guard passed.\n";

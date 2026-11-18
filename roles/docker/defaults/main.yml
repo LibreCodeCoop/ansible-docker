@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 ---
 # Supported: Debian, Ubuntu, RHEL, Rocky, AlmaLinux (x86_64/aarch64).
 docker_install_enabled: true

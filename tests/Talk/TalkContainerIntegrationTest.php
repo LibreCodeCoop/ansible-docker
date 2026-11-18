@@ -29,7 +29,7 @@ final class TalkContainerIntegrationTest extends TestCase
         try {
             TalkTestSupport::command([
                 'docker', 'run', '--rm', '--user', '0:0', '--entrypoint', 'chgrp',
-                '-v', self::$project . ':/hpb', 'busybox:1.37', '850', '/hpb/server.conf',
+                '-v', self::$project . ':/hpb', TalkTestSupport::helperImage(), '850', '/hpb/server.conf',
             ], timeout: 100);
             TalkTestSupport::command(array_merge(
                 self::compose(),
@@ -102,7 +102,7 @@ final class TalkContainerIntegrationTest extends TestCase
         $config = TalkTestSupport::variables($project, [
             'talk_public_ipv4' => '192.0.2.10',
             'talk_manage_coturn' => true,
-            'talk_coturn_image' => TalkTestSupport::COTURN_IMAGE,
+            'talk_coturn_image' => TalkTestSupport::coturnImage(),
             'talk_turn_realm' => 'turn.example.invalid',
             'talk_turn_servers' => ['turn:turn.example.invalid:3478?transport=udp'],
             'talk_turn_api_key' => bin2hex(random_bytes(16)),
@@ -112,7 +112,7 @@ final class TalkContainerIntegrationTest extends TestCase
             TalkTestSupport::render($parent, $config);
             TalkTestSupport::command([
                 'docker', 'run', '--rm', '--user', '0:0', '--entrypoint', 'chgrp',
-                '-v', $project . ':/hpb', 'busybox:1.37', '65533', '/hpb/turnserver.conf',
+                '-v', $project . ':/hpb', TalkTestSupport::helperImage(), '65533', '/hpb/turnserver.conf',
             ], timeout: 100);
             $compose = ['docker', 'compose', '-p', $name, '-f', $project . '/docker-compose.yml'];
             try {
@@ -151,13 +151,13 @@ final class TalkContainerIntegrationTest extends TestCase
         self::waitFor('janus', ['JANUS VideoRoom plugin initialized', 'WebSocketsEventHandler connected']);
         self::waitFor(
             'spreedbackend',
-            ['Connected to Janus WebRTC Server 1.4.3', 'Processing Janus events from']
+            ['Connected to Janus WebRTC Server', 'Processing Janus events from']
         );
         $this->runMedia();
         $previousJanus = substr_count(self::logs('janus'), 'WebSocketsEventHandler connected');
         $previousSignaling = substr_count(
             self::logs('spreedbackend'),
-            'Connected to Janus WebRTC Server 1.4.3'
+            'Connected to Janus WebRTC Server'
         );
         TalkTestSupport::command(
             array_merge(self::compose(), ['restart', 'spreedbackend']),
@@ -167,7 +167,7 @@ final class TalkContainerIntegrationTest extends TestCase
             static fn () => substr_count(self::logs('janus'), 'WebSocketsEventHandler connected') > $previousJanus
                 && substr_count(
                     self::logs('spreedbackend'),
-                    'Connected to Janus WebRTC Server 1.4.3'
+                    'Connected to Janus WebRTC Server'
                 ) > $previousSignaling,
             55
         );

@@ -10,6 +10,8 @@ declare(strict_types=1);
 namespace LibreCode\AnsibleDocker\Tests\Talk\Media;
 
 use Amp\TimeoutCancellation;
+use RuntimeException;
+use Throwable;
 use Amp\Websocket\Client\WebsocketHandshake;
 use Amp\Websocket\Client\WebsocketConnection;
 
@@ -49,24 +51,44 @@ final class JanusWebsocket
         if ($this->socket === null) {
             throw new RuntimeException('Janus websocket not connected');
         }
+
         $transaction = bin2hex(random_bytes(16));
-        $request = ['janus' => $type, 'transaction' => $transaction];
+        $payload = $this->makePayload($type, $transaction, $body, $jsep, $plugin);
+        $this->socket->sendText(json_encode($payload, JSON_THROW_ON_ERROR));
+
+        return $this->waitForResponse($transaction, $event);
+    }
+
+    /** @return array<string,mixed> */
+    private function makePayload(
+        string $type,
+        string $transaction,
+        ?array $body,
+        ?array $jsep,
+        ?string $plugin
+    ): array {
+        $payload = ['janus' => $type, 'transaction' => $transaction];
         if ($this->sessionId !== null && $type !== 'create') {
-            $request['session_id'] = $this->sessionId;
+            $payload['session_id'] = $this->sessionId;
         }
         if ($this->handleId !== null && $type === 'message') {
-            $request['handle_id'] = $this->handleId;
+            $payload['handle_id'] = $this->handleId;
         }
-        if ($body !== null) {
-            $request['body'] = $body;
+        foreach (['body' => $body, 'jsep' => $jsep, 'plugin' => $plugin] as $key => $value) {
+            if ($value !== null) {
+                $payload[$key] = $value;
+            }
         }
-        if ($jsep !== null) {
-            $request['jsep'] = $jsep;
+        return $payload;
+    }
+
+    /** @return array<string,mixed> */
+    private function waitForResponse(string $transaction, ?string $event): array
+    {
+        if ($this->socket === null) {
+            throw new RuntimeException('Janus websocket not connected');
         }
-        if ($plugin !== null) {
-            $request['plugin'] = $plugin;
-        }
-        $this->socket->sendText(json_encode($request, JSON_THROW_ON_ERROR));
+
         $timeout = new TimeoutCancellation(28);
         while (true) {
             $packet = $this->socket->receive($timeout);
@@ -74,26 +96,34 @@ final class JanusWebsocket
                 throw new RuntimeException('Janus websocket closed');
             }
             $response = json_decode($packet->buffer($timeout), true, flags: JSON_THROW_ON_ERROR);
-            if (($response['janus'] ?? '') === 'error' || isset($response['plugindata']['data']['error_code'])) {
-                throw new RuntimeException('Janus protocol or VideoRoom error');
-            }
+            $this->assertProtocolSuccess($response);
+
             if (($response['janus'] ?? '') === 'ack') {
                 continue;
             }
-            if ($event !== null) {
-                if (
-                    in_array($response['janus'] ?? '', ['event', 'success'], true)
-                    && ($response['sender'] ?? null) === $this->handleId
-                    && ($response['plugindata']['data']['videoroom'] ?? null) === $event
-                ) {
-                    return $response;
-                }
-                continue;
+            if ($event === null && ($response['transaction'] ?? null) === $transaction) {
+                return $response;
             }
-            if (($response['transaction'] ?? null) === $transaction) {
+            if ($event !== null && $this->matchesEvent($response, $event)) {
                 return $response;
             }
         }
+    }
+
+    /** @param array<string,mixed> $response */
+    private function assertProtocolSuccess(array $response): void
+    {
+        if (($response['janus'] ?? '') === 'error' || isset($response['plugindata']['data']['error_code'])) {
+            throw new RuntimeException('Janus protocol or VideoRoom error');
+        }
+    }
+
+    /** @param array<string,mixed> $response */
+    private function matchesEvent(array $response, string $event): bool
+    {
+        return in_array($response['janus'] ?? '', ['event', 'success'], true)
+            && ($response['sender'] ?? null) === $this->handleId
+            && ($response['plugindata']['data']['videoroom'] ?? null) === $event;
     }
 
     /** @return array<string,mixed> */

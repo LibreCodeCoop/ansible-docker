@@ -8,7 +8,7 @@ tmp="$(mktemp -d -t nc-mailcow-role.XXXXXXXX)"
 trap 'rm -rf -- "$tmp"' EXIT
 for tool in docker ansible-playbook bash; do command -v "$tool" >/dev/null || exit 2; done
 
-for version in 8.4 8.5; do
+for version in ${PHP_TEST_VERSION:-8.3 8.4 8.5}; do
   echo "PHP $version: offline provisioning, signature and warmup"
   docker run --rm --network none -v "$role:/repo:ro" -w /repo "php:$version-cli" sh -ec '
     for src in files/*.php tests/*.php; do php -l "$src" >/dev/null; done
@@ -25,10 +25,10 @@ ansible-playbook -i localhost, -c local \
   "$role/tests/render-templates.yml" \
   --extra-vars "{\"mail_test_output_dir\": \"$tmp\"}"
 docker run --rm --network none -v "$tmp:/fixtures" -v "$role:/repo:ro" \
-  php:8.4-cli php /repo/tests/verify_rendered_templates.php /fixtures
+  php:${version}-cli php /repo/tests/verify_rendered_templates.php /fixtures
 for file in "$tmp"/*.sh; do bash -n "$file"; done
 docker run --rm --network none -v "$tmp:/fixtures:ro" -v "$role:/repo:ro" \
-  php:8.4-cli bash /repo/tests/test_mail_warmup_runner.sh
+  php:${version}-cli bash /repo/tests/test_mail_warmup_runner.sh
 
 # The consuming playbook references the role by its directory name.
 if command -v ansible-playbook >/dev/null; then

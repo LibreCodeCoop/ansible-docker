@@ -14,8 +14,27 @@ use Symfony\Component\Process\Process;
 
 final class TalkTestSupport
 {
-    public const JANUS_IMAGE = 'ghcr.io/librecodecoop/janus:1.4.3-r1@sha256:7d9c1bd28bdbc7702de924ed8a676f5c1f11afa3abc888654d8d4fc8b78a00d2';
-    public const COTURN_IMAGE = 'coturn/coturn:4.6.3-alpine@sha256:e2bca2f79a4269d7240de5872ab60a9305013ad37296d2acf14f9510874346be';
+    public static function coturnImage(): string
+    {
+        $fixture = parse_ini_file(__DIR__ . '/fixtures/containers.env', false, INI_SCANNER_RAW);
+        if (!is_array($fixture) || !isset($fixture['TALK_TEST_COTURN_IMAGE'])) {
+            throw new RuntimeException('Missing disposable Coturn image fixture');
+        }
+        $image = getenv('TALK_TEST_COTURN_IMAGE') ?: $fixture['TALK_TEST_COTURN_IMAGE'];
+        if (!is_string($image) || preg_match('/^\\S+@sha256:[a-f0-9]{64}$/', $image) !== 1) {
+            throw new RuntimeException('Test Coturn image must be pinned to an immutable digest');
+        }
+        return $image;
+    }
+
+    public static function helperImage(): string
+    {
+        $fixture = parse_ini_file(__DIR__ . '/fixtures/containers.env', false, INI_SCANNER_RAW);
+        if (!is_array($fixture) || !isset($fixture['TALK_TEST_HELPER_IMAGE'])) {
+            throw new RuntimeException('Missing disposable helper image fixture');
+        }
+        return $fixture['TALK_TEST_HELPER_IMAGE'];
+    }
 
     public static function root(): string
     {

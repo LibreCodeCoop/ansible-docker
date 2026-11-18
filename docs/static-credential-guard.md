@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Preventing static credentials in public Ansible roles
 
 The public role repository must not hold runtime passwords, API keys, session
@@ -15,7 +20,7 @@ tracked working-tree files, without ever printing the field value. It rejects:
 - Inline `pgadmin_password` assignments;
 - Nonempty inline DB/JWT/password assignments in tracked `.env` files or
   `env.j2` / `.env.j2` templates for
-  the specific environment keys defined in the script.
+  the specific environment keys defined in the SecretLiteralGuard class.
 
 Simple Jinja variable references, environment variable references, and an
 Ansible Vault YAML tag are accepted. The existing empty OnlyOffice `.env`
@@ -25,7 +30,9 @@ runtime validation that a required secret is actually provided.
 Run locally:
 
 ```sh
-composer test
+composer install
+composer bin phpunit install
+composer test:unit
 php scripts/check_secret_literals.php
 ```
 

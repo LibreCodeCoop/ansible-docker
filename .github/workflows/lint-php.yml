@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Adapted from LibreCodeCoop/.github workflow-templates/lint-php.yml.
+name: Lint PHP syntax
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: lint-php-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Use Nextcloud 35 minimum PHP version
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+        with:
+          php-version: '8.3'
+          coverage: none
+      - name: Lint all tracked PHP files
+        run: git ls-files -z '*.php' | xargs -0 -r -n1 php -l

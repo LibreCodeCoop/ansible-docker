@@ -1,4 +1,7 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 name: Nextcloud Mailcow reusable role
+
 on:
   pull_request:
     paths:
@@ -9,17 +12,28 @@ on:
       - 'roles/nextcloud-mailcow-provision/**'
       - '.github/workflows/nextcloud-mailcow-provision-ci.yml'
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
   tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Ansible Core
         run: |
           python3 -m pip install --user 'ansible-core>=2.18,<2.22'
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Offline PHP tests, Ansible template rendering, and syntax
+        env:
+          PHP_TEST_VERSION: ${{ matrix.php }}
         run: bash roles/nextcloud-mailcow-provision/tests/check.sh
