@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<ruleset name="LibreCode complexity budget"
+    xmlns="http://pmd.sf.net/ruleset/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sf.net/ruleset/1.0.0 http://pmd.sf.net/ruleset_xml_schema.xsd">
+    <description>Limit complexity in reusable PHP domain classes and tests.</description>
+    <rule ref="rulesets/codesize.xml/CyclomaticComplexity">
+        <properties>
+            <property name="reportLevel" value="10"/>
+            <property name="showClassesComplexity" value="false"/>
+        </properties>
+    </rule>
+</ruleset>

@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Nextcloud Talk high-performance backend (HPB)
 
 This role renders and can deploy Janus, standalone signaling and NATS using

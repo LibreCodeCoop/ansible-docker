@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Nextcloud Mail + Mailcow provisioning
 
 Reutiliza APIs e serviços nativos do Nextcloud Mail e Mailcow para conectar contas elegíveis, preparar caixas novas e atribuir uma **assinatura padrão personalizada**, sem criar outro aplicativo Nextcloud. Esta role não interfere nas outras roles do repositório.

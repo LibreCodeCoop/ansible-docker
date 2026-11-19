@@ -1,10 +1,11 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 ---
 # Synthetic tenant used only to verify the portable runner.
 mail_provision_enabled: false
 mail_provision_install_dir: /usr/local/libexec/mail-provision
 mail_provision_config_dir: /etc/mail-provision
 mail_provision_cron_file: mail-provision-example
-mail_provision_runtime: docker
 mail_provision_php_bin: /usr/bin/php
 mail_provision_container: cloud-example-app
 mail_provision_container_user: www-data

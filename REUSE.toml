@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+version = 1
+
+[[annotations]]
+path = [
+    "COPYING",
+]
+SPDX-FileCopyrightText = "2007 Free Software Foundation, Inc."
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+[[annotations]]
+path = [
+    "composer.json",
+    "composer.lock",
+    "vendor-bin/phpcs/composer.json",
+    "vendor-bin/phpcs/composer.lock",
+    "vendor-bin/phpmd/composer.json",
+    "vendor-bin/phpmd/composer.lock",
+    "vendor-bin/phpstan/composer.json",
+    "vendor-bin/phpstan/composer.lock",
+    "vendor-bin/phpunit/composer.json",
+    "vendor-bin/phpunit/composer.lock",
+    "vendor-bin/psalm/composer.json",
+    "vendor-bin/psalm/composer.lock",
+]
+SPDX-FileCopyrightText = "2026 LibreCode Coop and contributors"
+SPDX-License-Identifier = "AGPL-3.0-or-later"

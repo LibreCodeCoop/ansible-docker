@@ -1,0 +1,44 @@
+{
+    "name": "librecodecoop/ansible-docker",
+    "description": "Reusable Ansible roles and isolated PHP test helpers",
+    "type": "project",
+    "license": "AGPL-3.0-or-later",
+    "require": {
+        "php": "^8.3"
+    },
+    "require-dev": {
+        "bamarni/composer-bin-plugin": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "LibreCode\\AnsibleDocker\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LibreCode\\AnsibleDocker\\Tests\\": "tests/",
+            "LibreCode\\AnsibleDocker\\Mail\\Tests\\": "roles/nextcloud-mailcow-provision/tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "bamarni/composer-bin-plugin": true
+        },
+        "sort-packages": true
+    },
+    "extra": {
+        "bamarni-bin": {
+            "bin-links": true,
+            "forward-command": false
+        }
+    },
+    "scripts": {
+        "test:unit": "vendor/bin/phpunit --testsuite Unit",
+        "test:integration": "vendor/bin/phpunit --testsuite Integration",
+        "test:talk": "vendor/bin/phpunit --testsuite Talk",
+        "phpcs": "vendor/bin/phpcs -q",
+        "phpstan": "vendor/bin/phpstan analyse --no-progress",
+        "psalm": "vendor/bin/psalm --no-cache",
+        "phpmd": "vendor/bin/phpmd src,scripts,tests text phpmd.xml --suffixes php"
+    }
+}

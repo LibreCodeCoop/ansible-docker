@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Nginx Proxy role
 
 This role deploys the shared Nginx proxy Compose project and its Docker network.

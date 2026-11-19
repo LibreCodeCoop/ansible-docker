@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+---
+- name: Verify Docker backend templates without contacting hosts
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - fixtures/mail-provision-instance.yml
+  vars:
+    mail_provision_runtime: docker
+    mail_provision_signature_enabled: true
+    mail_provision_signature_template: "{name}\n{role} | {organization}\n{email}"
+    mail_provision_signature_default_role: Member
+    mail_provision_signature_organization: Example Cooperative
+    mail_provision_signature_website: https://example.test
+  tasks:
+    - name: Render Docker reconciling runner
+      ansible.builtin.template:
+        src: ../templates/mail-provision-run.sh.j2
+        dest: "{{ mail_test_output_dir }}/docker-reconciler.sh"
+        mode: '0600'
+    - name: Render Docker warmup runner
+      ansible.builtin.template:
+        src: ../templates/mail-warmup-run.sh.j2
+        dest: "{{ mail_test_output_dir }}/docker-warmup.sh"
+        mode: '0600'
+
+- name: Verify native PHP backend templates without contacting hosts
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - fixtures/mail-provision-instance.yml
+  vars:
+    mail_provision_runtime: native
+    mail_provision_signature_enabled: true
+    mail_provision_signature_template: "{name}\n{role} | {organization}\n{email}"
+    mail_provision_signature_default_role: Member
+    mail_provision_signature_organization: Example Cooperative
+    mail_provision_signature_website: https://example.test
+  tasks:
+    - name: Render native reconciling runner
+      ansible.builtin.template:
+        src: ../templates/mail-provision-run.sh.j2
+        dest: "{{ mail_test_output_dir }}/native-reconciler.sh"
+        mode: '0600'
+    - name: Render native warmup runner
+      ansible.builtin.template:
+        src: ../templates/mail-warmup-run.sh.j2
+        dest: "{{ mail_test_output_dir }}/native-warmup.sh"
+        mode: '0600'

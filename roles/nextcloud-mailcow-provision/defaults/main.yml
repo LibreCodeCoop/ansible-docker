@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
 ---
 # Generic fail-closed defaults, overridden by the consumer's private host_vars.
 mail_provision_enabled: false
