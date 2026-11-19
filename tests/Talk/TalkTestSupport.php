@@ -148,7 +148,7 @@ final class TalkTestSupport
         rmdir($directory);
     }
 
-    public static function waitFor(callable $condition, int $seconds): void
+    public static function waitFor(callable $condition, int $seconds, string $context = 'Isolated test'): void
     {
         $deadline = microtime(true) + $seconds;
         while (microtime(true) < $deadline) {
@@ -157,6 +157,6 @@ final class TalkTestSupport
             }
             usleep(300_000);
         }
-        throw new RuntimeException('Isolated test condition was not met');
+        throw new RuntimeException($context . ' (timeout ' . $seconds . 's)');
     }
 }

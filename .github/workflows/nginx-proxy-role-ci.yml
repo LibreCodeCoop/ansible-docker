@@ -7,11 +7,15 @@ on:
     paths:
       - 'roles/nginx_proxy/**'
       - '.github/workflows/nginx-proxy-role-ci.yml'
+      - 'ci/install-ansible-collection.sh'
+      - 'tests/ci/**'
   push:
     branches: [main]
     paths:
       - 'roles/nginx_proxy/**'
       - '.github/workflows/nginx-proxy-role-ci.yml'
+      - 'ci/install-ansible-collection.sh'
+      - 'tests/ci/**'
 
 permissions:
   contents: read
@@ -26,7 +30,9 @@ jobs:
           python3 -m venv /tmp/ansible-qa
           /tmp/ansible-qa/bin/pip install 'ansible-core>=2.17,<2.21' 'ansible-lint>=24,<27'
       - name: Install pinned community Docker collection
-        run: /tmp/ansible-qa/bin/ansible-galaxy collection install community.docker:5.0.5 -p /tmp/ansible-collections
+        run: |
+          export PATH="/tmp/ansible-qa/bin:$PATH"
+          bash ci/install-ansible-collection.sh community.docker:5.0.5 /tmp/ansible-collections
       - name: Validate syntax and lint
         run: |
           export ANSIBLE_ROLES_PATH="$GITHUB_WORKSPACE/roles"
