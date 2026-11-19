@@ -23,6 +23,14 @@ final class RenderedTemplateVerifierTest extends TestCase
         yield 'missing enabled flag' => ['native-reconciler.sh', 'Example Cooperative'];
         yield 'missing signature organization' => ['docker-reconciler.sh', 'MAIL_PROVISION_SIGNATURE_ENABLED=1'];
         yield 'unresolved warmup' => ['native-warmup.sh', 'not rendered {{ broken }}'];
+        yield 'Docker reconciler rendered as native' => [
+            'docker-reconciler.sh', "MAIL_PROVISION_SIGNATURE_ENABLED=1\nExample Cooperative\nrunuser -u",
+        ];
+        yield 'native reconciler rendered as Docker' => [
+            'native-reconciler.sh', "MAIL_PROVISION_SIGNATURE_ENABLED=1\nExample Cooperative\ndocker exec",
+        ];
+        yield 'Docker warmup rendered as native' => ['docker-warmup.sh', 'runuser -u'];
+        yield 'native warmup rendered as Docker' => ['native-warmup.sh', 'docker exec'];
     }
 
     #[DataProvider('badTemplates')]
@@ -44,7 +52,7 @@ final class RenderedTemplateVerifierTest extends TestCase
         try {
             (new RenderedTemplateVerifier())->verify($temp);
             self::assertFileExists($temp . '/primary-warmup.sh');
-            self::assertSame('SYNTHETIC-WARMUP', file_get_contents($temp . '/primary-warmup.sh'));
+            self::assertStringContainsString('SYNTHETIC-WARMUP', file_get_contents($temp . '/primary-warmup.sh'));
         } finally {
             $this->removeFixtureDirectory($temp);
         }
@@ -55,11 +63,12 @@ final class RenderedTemplateVerifierTest extends TestCase
         $temp = sys_get_temp_dir() . '/mail-template-' . bin2hex(random_bytes(8));
         mkdir($temp, 0700);
         foreach (['docker', 'native'] as $backend) {
+            $invoker = $backend === 'native' ? 'runuser -u' : 'docker exec';
             file_put_contents(
                 $temp . '/' . $backend . '-reconciler.sh',
-                "MAIL_PROVISION_SIGNATURE_ENABLED=1\nExample Cooperative"
+                "MAIL_PROVISION_SIGNATURE_ENABLED=1\nExample Cooperative\n" . $invoker
             );
-            file_put_contents($temp . '/' . $backend . '-warmup.sh', 'SYNTHETIC-WARMUP');
+            file_put_contents($temp . '/' . $backend . '-warmup.sh', 'SYNTHETIC-WARMUP' . "\n" . $invoker);
         }
         return $temp;
     }

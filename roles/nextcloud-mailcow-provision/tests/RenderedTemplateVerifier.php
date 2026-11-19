@@ -29,12 +29,19 @@ final class RenderedTemplateVerifier
     private function check(string $directory, string $backend, string $runner): void
     {
         $path = $directory . '/' . $backend . '-' . $runner . '.sh';
-        $contents = file_get_contents($path);
+        $contents = @file_get_contents($path);
         if (!is_string($contents)) {
             throw new RuntimeException('A rendered test template is missing or unreadable');
         }
         if (str_contains($contents, '{{')) {
             throw new RuntimeException('Ansible left an unresolved Jinja expression');
+        }
+
+        // Verify actual runner behavior, not just that Jinja emitted valid shell.
+        $required = $backend === 'native' ? 'runuser -u' : 'docker exec';
+        $forbidden = $backend === 'native' ? 'docker exec' : 'runuser -u';
+        if (!str_contains($contents, $required) || str_contains($contents, $forbidden)) {
+            throw new RuntimeException('Unexpected runtime backend in rendered runner');
         }
         if ($runner === 'reconciler') {
             $this->checkSignature($contents);

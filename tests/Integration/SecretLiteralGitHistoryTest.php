@@ -47,6 +47,48 @@ final class SecretLiteralGitHistoryTest extends TestCase
         }
     }
 
+    public function testTrackedButDeletedLocalFileIsSkipped(): void
+    {
+        [$root, $file] = $this->createTrackedEnvironmentFixture();
+        try {
+            unlink($file);
+            $findings = (new RepositoryCredentialScanner(new SecretLiteralGuard(), new GitRepository($root)))->scan();
+            self::assertSame([], $findings);
+        } finally {
+            $this->removeTree($root);
+        }
+    }
+
+    public function testTrackedFileReplacedWithBrokenSymlinkFailsClosed(): void
+    {
+        [$root, $file] = $this->createTrackedEnvironmentFixture();
+        try {
+            unlink($file);
+            self::assertTrue(symlink('synthetic-missing-target', $file));
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('Tracked security-sensitive file is a symbolic link');
+            (new RepositoryCredentialScanner(new SecretLiteralGuard(), new GitRepository($root)))->scan();
+        } finally {
+            $this->removeTree($root);
+        }
+    }
+
+    /** @return array{string,string} */
+    private function createTrackedEnvironmentFixture(): array
+    {
+        $root = sys_get_temp_dir() . '/secret-worktree-' . bin2hex(random_bytes(8));
+        mkdir($root, 0700);
+        $this->git($root, 'init -q -b main');
+        $this->git($root, 'config user.name "Synthetic Test"');
+        $this->git($root, 'config user.email "synthetic@example.invalid"');
+        $this->git($root, 'config commit.gpgsign false');
+        $file = $root . '/.env';
+        file_put_contents($file, 'DB_PWD={{ synthetic_password }}' . "\n");
+        $this->git($root, 'add .env');
+        $this->git($root, 'commit -qm baseline');
+        return [$root, $file];
+    }
+
     private function git(string $root, string $args, bool $check = true): string
     {
         $output = [];

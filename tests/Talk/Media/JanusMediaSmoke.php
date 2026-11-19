@@ -146,7 +146,7 @@ final class JanusMediaSmoke
     private function verifyRealMedia(): void
     {
         $deadline = microtime(true) + 22;
-        while (microtime(true) < $deadline && !$this->mediaComplete()) {
+        while (microtime(true) < $deadline && !$this->mediaComplete() && $this->collector->failure === null) {
             delay(0.25);
         }
         echo "WEBRTC_RESULT " . json_encode([
@@ -155,6 +155,9 @@ final class JanusMediaSmoke
             'received_frames' => $this->collector->counts,
         ], JSON_THROW_ON_ERROR) . "\n";
 
+        if ($this->collector->failure !== null) {
+            throw new RuntimeException($this->collector->failure);
+        }
         if (!$this->mediaComplete()) {
             throw new RuntimeException('Audio/video receipt or ICE connection validation failed');
         }
@@ -162,7 +165,7 @@ final class JanusMediaSmoke
 
     private function mediaComplete(): bool
     {
-        return $this->receipt->hasMinimum($this->collector->counts)
+        return $this->receipt->hasMinimum($this->collector->counts, MediaCollector::SAMPLE_FRAMES)
             && $this->publisher->getConnectionState() === ConnectionState::connected
             && $this->subscriber->getConnectionState() === ConnectionState::connected;
     }

@@ -24,17 +24,18 @@ done
 ansible-playbook -i localhost, -c local \
   "$role/tests/render-templates.yml" \
   --extra-vars "{\"mail_test_output_dir\": \"$tmp\"}"
-docker run --rm --network none -v "$tmp:/fixtures" -v "$role:/repo:ro" \
-  php:${version}-cli php /repo/tests/verify_rendered_templates.php /fixtures
 for file in "$tmp"/*.sh; do bash -n "$file"; done
-docker run --rm --network none -v "$tmp:/fixtures:ro" -v "$role:/repo:ro" \
-  php:${version}-cli bash /repo/tests/test_mail_warmup_runner.sh
+# Validate every selected PHP version, including the default local version list.
+for version in ${PHP_TEST_VERSION:-8.3 8.4 8.5}; do
+  docker run --rm --network none -v "$tmp:/fixtures" -v "$role:/repo:ro" \
+    "php:${version}-cli" php /repo/tests/verify_rendered_templates.php /fixtures
+  docker run --rm --network none -v "$tmp:/fixtures:ro" -v "$role:/repo:ro" \
+    "php:${version}-cli" bash /repo/tests/test_mail_warmup_runner.sh
+done
 
 # The consuming playbook references the role by its directory name.
-if command -v ansible-playbook >/dev/null; then
-  ANSIBLE_ROLES_PATH="$(dirname "$role")" \
-    ansible-playbook -i localhost, -c local \
-    "$role/tests/syntax.yml" --syntax-check
-fi
+ANSIBLE_ROLES_PATH="$(dirname "$role")" \
+  ansible-playbook -i localhost, -c local \
+  "$role/tests/syntax.yml" --syntax-check
 
 echo "PUBLIC_MAILCOW_ROLE_TESTS_PASS"

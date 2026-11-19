@@ -33,6 +33,7 @@ Run locally:
 composer install
 composer bin phpunit install
 composer test:unit
+composer test:integration
 php scripts/check_secret_literals.php
 ```
 

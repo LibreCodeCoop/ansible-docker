@@ -39,10 +39,14 @@ final class RepositoryCredentialScanner
                 continue;
             }
             $path = $this->repository->root() . '/' . $name;
+            if (!file_exists($path) && !is_link($path)) {
+                // Deleted but not yet staged files are still returned by git ls-files.
+                continue;
+            }
             if (is_link($path)) {
                 throw new RuntimeException('Tracked security-sensitive file is a symbolic link');
             }
-            $contents = file_get_contents($path);
+            $contents = @file_get_contents($path);
             if (!is_string($contents)) {
                 throw new RuntimeException('Unable to read tracked file');
             }

@@ -21,7 +21,10 @@ final class SecretLiteralGuardTest extends TestCase
     {
         $talk = 'roles/nextcloud-talk/templates/server.conf.j2';
         $env = 'roles/onlyoffice/files/.env';
-        yield 'talk literal' => [$talk, 'hashkey = synthetic-value', [['line' => 1, 'field' => 'hashkey']]];
+        yield 'talk hashkey literal' => [$talk, 'hashkey = synthetic-value', [['line' => 1, 'field' => 'hashkey']]];
+        yield 'talk blockkey literal' => [$talk, 'blockkey = synthetic-value', [['line' => 1, 'field' => 'blockkey']]];
+        yield 'talk internalsecret literal' => [$talk, 'internalsecret = synthetic-value', [['line' => 1, 'field' => 'internalsecret']]];
+        yield 'talk apikey literal' => [$talk, 'apikey = synthetic-value', [['line' => 1, 'field' => 'apikey']]];
         yield 'talk variable' => [$talk, 'hashkey = {{ talk_hashkey }}', []];
         yield 'talk quoted Jinja' => [$talk, 'hashkey = "{{ talk_hashkey }}" # comment', []];
         yield 'reject injected Jinja fallback' => [$talk, "hashkey = {{ var | default('unsafe') }}", [['line' => 1, 'field' => 'hashkey']]];
