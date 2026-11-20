@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Ansible repository syntax contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ansible-syntax-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install isolated Ansible core
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --disable-pip-version-check 'ansible-core>=2.18,<2.22'
+      - name: Verify bounded Galaxy installation retry policy
+        run: bash tests/ci/test-install-ansible-collection.sh
+      - name: Install required Docker collection
+        run: |
+          export PATH="$PWD/.venv/bin:$PATH"
+          bash ci/install-ansible-collection.sh community.docker:5.0.5 /tmp/ansible-collections
+      - name: Compile every role and root playbook without contacting hosts
+        env:
+          ANSIBLE_ROLES_PATH: ${{ github.workspace }}/roles
+          ANSIBLE_COLLECTIONS_PATH: /tmp/ansible-collections
+          ANSIBLE_CONFIG: ${{ github.workspace }}/ansible.cfg
+        run: |
+          set -euo pipefail
+          . .venv/bin/activate
+          ansible-playbook -i localhost, -c local --syntax-check tests/ansible/all-roles-syntax.yml
+          for playbook in ./*.yml; do
+            ansible-playbook -i localhost, -c local --syntax-check "$playbook"
+          done

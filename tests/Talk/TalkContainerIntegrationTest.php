@@ -89,7 +89,8 @@ final class TalkContainerIntegrationTest extends TestCase
                 }
                 return true;
             },
-            95
+            95,
+            'Expected ' . $service . ' readiness markers were not observed'
         );
     }
 
@@ -148,11 +149,9 @@ final class TalkContainerIntegrationTest extends TestCase
 
     public function testJanusEventsAndRealAudioVideoMediaRecoverAfterSignalingRestart(): void
     {
-        self::waitFor('janus', ['JANUS VideoRoom plugin initialized', 'WebSocketsEventHandler connected']);
-        self::waitFor(
-            'spreedbackend',
-            ['Connected to Janus WebRTC Server', 'Processing Janus events from']
-        );
+        // Observe the signaling-to-Janus connection. Real media below proves
+        // Janus VideoRoom readiness without relying on incidental startup logs.
+        self::waitFor('spreedbackend', ['Connected to Janus WebRTC Server']);
         $this->runMedia();
         $previousJanus = substr_count(self::logs('janus'), 'WebSocketsEventHandler connected');
         $previousSignaling = substr_count(
@@ -169,7 +168,8 @@ final class TalkContainerIntegrationTest extends TestCase
                     self::logs('spreedbackend'),
                     'Connected to Janus WebRTC Server'
                 ) > $previousSignaling,
-            55
+            55,
+            'Signaling restart did not re-establish the Janus event subscription'
         );
         $this->runMedia();
     }

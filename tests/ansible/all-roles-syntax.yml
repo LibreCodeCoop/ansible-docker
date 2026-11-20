@@ -1,0 +1,17 @@
+---
+# SPDX-FileCopyrightText: 2026 LibreCode Coop and contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Syntax-only: never runs tasks or contacts a managed host.
+- name: Compile all reusable roles with deployment disabled
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    talk_deploy_enabled: false
+    mail_provision_enabled: false
+  roles:
+    - docker
+    - nginx_proxy
+    - onlyoffice
+    - nextcloud-talk
+    - nextcloud-mailcow-provision
